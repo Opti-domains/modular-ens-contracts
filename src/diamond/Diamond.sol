@@ -2,26 +2,28 @@
 
 pragma solidity ^0.8.8;
 
-import { IOwnable, Ownable, OwnableInternal } from '@solidstate/contracts/access/ownable/Ownable.sol';
-import { ISafeOwnable, SafeOwnable } from '@solidstate/contracts/access/ownable/SafeOwnable.sol';
-import { IERC173 } from '@solidstate/contracts/interfaces/IERC173.sol';
-import { DiamondBase } from '@solidstate/contracts/proxy/diamond/base/DiamondBase.sol';
-import { DiamondFallback, IDiamondFallback } from '@solidstate/contracts/proxy/diamond/fallback/DiamondFallback.sol';
-import { DiamondReadable, IDiamondReadable } from '@solidstate/contracts/proxy/diamond/readable/DiamondReadable.sol';
-import { DiamondWritable, IDiamondWritable } from '@solidstate/contracts/proxy/diamond/writable/DiamondWritable.sol';
-import { ISolidStateDiamond, IERC165 } from '@solidstate/contracts/proxy/diamond/ISolidStateDiamond.sol';
-import { ERC165BaseInternal } from "@solidstate/contracts/introspection/ERC165/base/ERC165BaseInternal.sol";
+import {IOwnable, Ownable, OwnableInternal} from "@solidstate/contracts/access/ownable/Ownable.sol";
+import {ISafeOwnable, SafeOwnable} from "@solidstate/contracts/access/ownable/SafeOwnable.sol";
+import {IERC173} from "@solidstate/contracts/interfaces/IERC173.sol";
+import {DiamondBase} from "@solidstate/contracts/proxy/diamond/base/DiamondBase.sol";
+import {DiamondFallback, IDiamondFallback} from "@solidstate/contracts/proxy/diamond/fallback/DiamondFallback.sol";
+import {DiamondReadable, IDiamondReadable} from "@solidstate/contracts/proxy/diamond/readable/DiamondReadable.sol";
+import {DiamondWritable, IDiamondWritable} from "@solidstate/contracts/proxy/diamond/writable/DiamondWritable.sol";
+import {ISolidStateDiamond, IERC165} from "@solidstate/contracts/proxy/diamond/ISolidStateDiamond.sol";
+import {ERC165BaseInternal} from "@solidstate/contracts/introspection/ERC165/base/ERC165BaseInternal.sol";
 import "./DiamondBaseExtendable.sol";
+import "./DiamondCloneFactory.sol";
 
 /**
- * @title SolidState "Diamond" proxy reference implementation
- * Overrided to fix non-virtual function in ERC165Base implementation
+ * @title extended from SolidState "Diamond" proxy reference implementation
+ * Overrided to add inheritance and clone functionalities and fix non-virtual function in ERC165Base implementation
  */
-abstract contract SolidStateDiamond is
+abstract contract Diamond is
     ISolidStateDiamond,
     DiamondBaseExtendable,
     DiamondReadable,
     DiamondWritable,
+    DiamondCloneFactory,
     SafeOwnable,
     ERC165BaseInternal
 {
@@ -43,20 +45,14 @@ abstract contract SolidStateDiamond is
         require(!initialization.initialized, "Initialized");
 
         if (_fallback == address(0)) {
-            bytes4[] memory selectors = new bytes4[](13);
+            bytes4[] memory selectors = new bytes4[](14);
             uint256 selectorIndex;
 
             // register DiamondFallback
 
-            selectors[selectorIndex++] = IDiamondFallback
-                .getFallbackAddress
-                .selector;
-            selectors[selectorIndex++] = IDiamondFallback
-                .setFallbackAddress
-                .selector;
-            selectors[selectorIndex++] = IDiamondBaseExtendable
-                .getImplementation
-                .selector;
+            selectors[selectorIndex++] = IDiamondFallback.getFallbackAddress.selector;
+            selectors[selectorIndex++] = IDiamondFallback.setFallbackAddress.selector;
+            selectors[selectorIndex++] = IDiamondBaseExtendable.getImplementation.selector;
 
             // register DiamondWritable
 
@@ -65,9 +61,7 @@ abstract contract SolidStateDiamond is
             // register DiamondReadable
 
             selectors[selectorIndex++] = IDiamondReadable.facets.selector;
-            selectors[selectorIndex++] = IDiamondReadable
-                .facetFunctionSelectors
-                .selector;
+            selectors[selectorIndex++] = IDiamondReadable.facetFunctionSelectors.selector;
             selectors[selectorIndex++] = IDiamondReadable.facetAddresses.selector;
             selectors[selectorIndex++] = IDiamondReadable.facetAddress.selector;
 
@@ -82,17 +76,17 @@ abstract contract SolidStateDiamond is
             selectors[selectorIndex++] = Ownable.transferOwnership.selector;
             selectors[selectorIndex++] = SafeOwnable.acceptOwnership.selector;
 
+            // register DiamondCloneFactory
+
+            selectors[selectorIndex++] = IDiamondCloneFactory.clone.selector;
+
             // diamond cut
 
             FacetCut[] memory facetCuts = new FacetCut[](1);
 
-            facetCuts[0] = FacetCut({
-                target: address(this),
-                action: FacetCutAction.ADD,
-                selectors: selectors
-            });
+            facetCuts[0] = FacetCut({target: address(this), action: FacetCutAction.ADD, selectors: selectors});
 
-            _diamondCut(facetCuts, address(0), '');
+            _diamondCut(facetCuts, address(0), "");
         } else {
             _setFallbackAddress(_fallback);
         }
@@ -101,6 +95,7 @@ abstract contract SolidStateDiamond is
         _setSupportsInterface(type(IDiamondFallback).interfaceId, true);
         _setSupportsInterface(type(IDiamondWritable).interfaceId, true);
         _setSupportsInterface(type(IDiamondReadable).interfaceId, true);
+        _setSupportsInterface(type(IDiamondCloneFactory).interfaceId, true);
         _setSupportsInterface(type(IERC165).interfaceId, true);
         _setSupportsInterface(type(IERC173).interfaceId, true);
 
@@ -111,15 +106,11 @@ abstract contract SolidStateDiamond is
 
     receive() external payable {}
 
-    function _transferOwnership(
-        address account
-    ) internal virtual override(OwnableInternal, SafeOwnable) {
+    function _transferOwnership(address account) internal virtual override(OwnableInternal, SafeOwnable) {
         super._transferOwnership(account);
     }
 
-    function supportsInterface(
-        bytes4 interfaceID
-    ) public view virtual override(IERC165) returns (bool result) {
+    function supportsInterface(bytes4 interfaceID) public view virtual override(IERC165) returns (bool result) {
         result = _supportsInterface(interfaceID);
         if (!result) {
             address fallbackAddress = _getFallbackAddress();

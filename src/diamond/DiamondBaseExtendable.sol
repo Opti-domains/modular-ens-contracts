@@ -2,10 +2,11 @@
 
 pragma solidity ^0.8.8;
 
-import { OwnableInternal } from '@solidstate/contracts/access/ownable/OwnableInternal.sol';
-import { DiamondBaseStorage } from '@solidstate/contracts/proxy/diamond/base/DiamondBaseStorage.sol';
-import { IDiamondFallback } from '@solidstate/contracts/proxy/diamond/fallback/IDiamondFallback.sol';
-import { Proxy } from '@solidstate/contracts/proxy/Proxy.sol';
+import {OwnableInternal} from "@solidstate/contracts/access/ownable/OwnableInternal.sol";
+import {DiamondBaseStorage} from "@solidstate/contracts/proxy/diamond/base/DiamondBaseStorage.sol";
+import {IDiamondFallback} from "@solidstate/contracts/proxy/diamond/fallback/IDiamondFallback.sol";
+import {Proxy} from "@solidstate/contracts/proxy/Proxy.sol";
+import {IERC165} from "@solidstate/contracts/proxy/diamond/ISolidStateDiamond.sol";
 
 interface IDiamondBaseExtendable is IDiamondFallback {
     function getImplementation(bytes4 sig) external view returns (address);
@@ -14,19 +15,11 @@ interface IDiamondBaseExtendable is IDiamondFallback {
 /**
  * @title Fallback feature for EIP-2535 "Diamond" proxy
  */
-abstract contract DiamondBaseExtendable is
-    IDiamondBaseExtendable,
-    Proxy,
-    OwnableInternal
-{
+abstract contract DiamondBaseExtendable is IDiamondBaseExtendable, Proxy, OwnableInternal {
     /**
      * @inheritdoc IDiamondFallback
      */
-    function getFallbackAddress()
-        external
-        view
-        returns (address fallbackAddress)
-    {
+    function getFallbackAddress() external view returns (address fallbackAddress) {
         fallbackAddress = _getFallbackAddress();
     }
 
@@ -37,13 +30,7 @@ abstract contract DiamondBaseExtendable is
         _setFallbackAddress(fallbackAddress);
     }
 
-    function _getImplementation()
-        internal
-        view
-        virtual
-        override
-        returns (address implementation)
-    {
+    function _getImplementation() internal view virtual override returns (address implementation) {
         implementation = getImplementation(msg.sig);
     }
 
@@ -60,7 +47,9 @@ abstract contract DiamondBaseExtendable is
         if (implementation == address(0)) {
             implementation = _getFallbackAddress();
             if (implementation != address(0)) {
-                implementation = IDiamondBaseExtendable(payable(implementation)).getImplementation(sig);
+                if (IERC165(implementation).supportsInterface(type(IDiamondBaseExtendable).interfaceId)) {
+                    implementation = IDiamondBaseExtendable(payable(implementation)).getImplementation(sig);
+                }
             }
         }
     }
@@ -69,12 +58,7 @@ abstract contract DiamondBaseExtendable is
      * @notice query the address of the fallback implementation
      * @return fallbackAddress address of fallback implementation
      */
-    function _getFallbackAddress()
-        internal
-        view
-        virtual
-        returns (address fallbackAddress)
-    {
+    function _getFallbackAddress() internal view virtual returns (address fallbackAddress) {
         fallbackAddress = DiamondBaseStorage.layout().fallbackAddress;
     }
 
