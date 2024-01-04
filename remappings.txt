@@ -3,4 +3,5 @@ erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/
 forge-std/=lib/forge-std/src/
 @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 @ensdomains/ens-contracts/=lib/ens-contracts/contracts/
+@ensdomains/buffer/contracts/=lib/buffer/contracts/
 @solidstate/contracts/=lib/solidstate-solidity/contracts/
