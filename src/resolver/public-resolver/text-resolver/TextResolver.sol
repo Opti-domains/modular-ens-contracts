@@ -2,14 +2,14 @@
 pragma solidity >=0.8.4;
 
 import {IERC165} from "@solidstate/contracts/interfaces/IERC165.sol";
-import "src/resolver/attestor/OptiResolverAttestor.sol";
+import "src/resolver/attester/OptiResolverAttester.sol";
 import "src/resolver/auth/OptiResolverAuth.sol";
 import "src/resolver/public-resolver/text-resolver/ITextResolver.sol";
 
 bytes32 constant TEXT_RESOLVER_SCHEMA =
     keccak256(abi.encodePacked("bytes32 node,string key,string value", address(0), true));
 
-abstract contract TextResolver is ITextResolver, OptiResolverAttestor, OptiResolverAuth, IERC165 {
+abstract contract TextResolver is ITextResolver, OptiResolverAttester, OptiResolverAuth, IERC165 {
     /**
      * Sets the text data associated with an ENS node and key.
      * May only be called by the owner of that node in the ENS registry.

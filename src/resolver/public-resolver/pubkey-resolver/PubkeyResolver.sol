@@ -2,7 +2,7 @@
 pragma solidity >=0.8.4;
 
 import {IERC165} from "@solidstate/contracts/interfaces/IERC165.sol";
-import "src/resolver/attestor/OptiResolverAttestor.sol";
+import "src/resolver/attester/OptiResolverAttester.sol";
 import "src/resolver/auth/OptiResolverAuth.sol";
 import "src/resolver/public-resolver/pubkey-resolver/IPubkeyResolver.sol";
 
@@ -10,7 +10,7 @@ bytes32 constant PUBKEY_RESOLVER_STORAGE = keccak256("optidomains.resolver.Pubke
 bytes32 constant PUBKEY_RESOLVER_SCHEMA =
     keccak256(abi.encodePacked("bytes32 node,bytes32 x,bytes32 y", address(0), true));
 
-abstract contract PubkeyResolver is IPubkeyResolver, OptiResolverAttestor, OptiResolverAuth, IERC165 {
+abstract contract PubkeyResolver is IPubkeyResolver, OptiResolverAttester, OptiResolverAuth, IERC165 {
     struct PublicKey {
         bytes32 x;
         bytes32 y;

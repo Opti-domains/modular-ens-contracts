@@ -2,8 +2,12 @@
 
 pragma solidity ^0.8.8;
 
-abstract contract OptiResolverAttestorBase {
-    function _read(bytes32 schema, address recipient, bytes memory header) internal view virtual returns (bytes memory);
+abstract contract OptiResolverAttesterBase {
+    function _read(bytes32 schema, address recipient, bytes memory header)
+        internal
+        view
+        virtual
+        returns (bytes memory);
 
     function _write(
         bytes32 schema,

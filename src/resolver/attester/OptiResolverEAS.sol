@@ -2,12 +2,12 @@
 pragma solidity ^0.8.8;
 
 import "@ethereum-attestation-service/eas-contracts/contracts/IEAS.sol";
-import "src/resolver/attestor/OptiResolverAttestorBase.sol";
+import "src/resolver/attester/OptiResolverAttesterBase.sol";
 
 // TODO
 address constant EAS = 0x0000000000000000000000000000000000000000;
 
-contract OptiResolverEAS is OptiResolverAttestorBase {
+contract OptiResolverEAS is OptiResolverAttesterBase {
     function _read(bytes32 schema, address recipient, bytes memory header)
         internal
         view

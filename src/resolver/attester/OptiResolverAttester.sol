@@ -2,14 +2,14 @@
 pragma solidity ^0.8.8;
 
 import "@ensdomains/ens-contracts/registry/ENS.sol";
-import "src/resolver/attestor/OptiResolverAttestorBase.sol";
+import "src/resolver/attester/OptiResolverAttesterBase.sol";
 
 // TODO
 address constant ENS_REGISTRY = 0x0000000000000000000000000000000000000000;
 
 error DomainNotFound(bytes32 node);
 
-abstract contract OptiResolverAttestor is OptiResolverAttestorBase {
+abstract contract OptiResolverAttester is OptiResolverAttesterBase {
     function _read(bytes32 schema, bytes memory header) internal view virtual returns (bytes memory) {
         bytes32 node = abi.decode(header, (bytes32));
         address recipient = ENS(ENS_REGISTRY).owner(node);

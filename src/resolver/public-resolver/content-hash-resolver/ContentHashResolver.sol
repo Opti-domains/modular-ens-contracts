@@ -2,13 +2,13 @@
 pragma solidity >=0.8.4;
 
 import {IERC165} from "@solidstate/contracts/interfaces/IERC165.sol";
-import "src/resolver/attestor/OptiResolverAttestor.sol";
+import "src/resolver/attester/OptiResolverAttester.sol";
 import "src/resolver/auth/OptiResolverAuth.sol";
 import "src/resolver/public-resolver/content-hash-resolver/IContentHashResolver.sol";
 
 bytes32 constant CONTENT_RESOLVER_SCHEMA = keccak256(abi.encodePacked("bytes32 node,bytes hash", address(0), true));
 
-abstract contract ContentHashResolver is IContentHashResolver, OptiResolverAttestor, OptiResolverAuth, IERC165 {
+abstract contract ContentHashResolver is IContentHashResolver, OptiResolverAttester, OptiResolverAuth, IERC165 {
     /**
      * Sets the contenthash associated with an ENS node.
      * May only be called by the owner of that node in the ENS registry.

@@ -3,7 +3,7 @@ pragma solidity >=0.8.4;
 
 import {IERC165} from "@solidstate/contracts/interfaces/IERC165.sol";
 import "@ensdomains/ens-contracts/dnssec-oracle/RRUtils.sol";
-import "src/resolver/attestor/OptiResolverAttestor.sol";
+import "src/resolver/attester/OptiResolverAttester.sol";
 import "src/resolver/auth/OptiResolverAuth.sol";
 import "src/resolver/public-resolver/dns-resolver/IDNSRecordResolver.sol";
 import "src/resolver/public-resolver/dns-resolver/IDNSZoneResolver.sol";
@@ -18,7 +18,7 @@ bytes32 constant DNS_RESOLVER_SCHEMA_COUNT =
 abstract contract DNSResolver is
     IDNSRecordResolver,
     IDNSZoneResolver,
-    OptiResolverAttestor,
+    OptiResolverAttester,
     OptiResolverAuth,
     IERC165
 {
