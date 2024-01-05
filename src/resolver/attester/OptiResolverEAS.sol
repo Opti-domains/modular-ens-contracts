@@ -4,6 +4,8 @@ pragma solidity ^0.8.8;
 import "@ethereum-attestation-service/eas-contracts/contracts/IEAS.sol";
 import "src/resolver/attester/OptiResolverAttesterBase.sol";
 
+bytes32 constant RESOLVER_STORAGE_NAMESPACE = keccak256("optidomains.resolver.storage");
+
 // TODO
 address constant EAS = 0x0000000000000000000000000000000000000000;
 
@@ -13,9 +15,9 @@ contract OptiResolverEAS is OptiResolverAttesterBase {
         view
         virtual
         override
-        returns (bytes memory)
+        returns (bytes memory data)
     {
-        bytes32 s = keccak256(abi.encode(schema, recipient, header));
+        bytes32 s = keccak256(abi.encode(RESOLVER_STORAGE_NAMESPACE, schema, recipient, header));
         bytes32 uid;
 
         assembly {
@@ -24,13 +26,28 @@ contract OptiResolverEAS is OptiResolverAttesterBase {
 
         if (uid == bytes32(0)) return "";
 
-        Attestation memory data = IEAS(EAS).getAttestation(uid);
+        Attestation memory a = IEAS(EAS).getAttestation(uid);
 
         if (
-            data.uid == uid && data.schema == schema
-                && (data.expirationTime == 0 || block.timestamp <= data.expirationTime) && data.revocationTime == 0
-                && data.recipient == recipient && data.attester == address(this)
-        ) {}
+            a.uid == uid && a.schema == schema && (a.expirationTime == 0 || block.timestamp <= a.expirationTime)
+                && a.revocationTime == 0 && a.recipient == recipient && a.attester == address(this)
+        ) {
+            data = a.data;
+
+            uint256 headerLength = header.length;
+            uint256 bodyLength = data.length - headerLength;
+
+            assembly {
+                // Calculate the position of the body
+                let bodyPosition := add(data, headerLength)
+
+                // Store body length at the start of body
+                mstore(bodyPosition, bodyLength)
+
+                // Set data to start at body
+                data := bodyPosition
+            }
+        }
     }
 
     function _write(
