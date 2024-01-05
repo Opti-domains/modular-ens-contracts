@@ -5,3 +5,4 @@ forge-std/=lib/forge-std/src/
 @ensdomains/ens-contracts/=lib/ens-contracts/contracts/
 @ensdomains/buffer/contracts/=lib/buffer/contracts/
 @solidstate/contracts/=lib/solidstate-solidity/contracts/
+@ethereum-attestation-service/eas-contracts/contracts/=lib/eas-contracts/contracts/
