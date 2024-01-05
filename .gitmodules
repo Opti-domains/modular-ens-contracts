@@ -13,3 +13,6 @@
 [submodule "lib/buffer"]
 	path = lib/buffer
 	url = https://github.com/ensdomains/buffer
+[submodule "lib/eas-contracts"]
+	path = lib/eas-contracts
+	url = https://github.com/ethereum-attestation-service/eas-contracts
