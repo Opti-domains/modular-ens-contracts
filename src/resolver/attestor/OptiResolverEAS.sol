@@ -29,6 +29,7 @@ contract OptiResolverEAS is OptiResolverAttestorBase {
         if (
             data.uid == uid && data.schema == schema
                 && (data.expirationTime == 0 || block.timestamp <= data.expirationTime) && data.revocationTime == 0
+                && data.recipient == recipient && data.attester == address(this)
         ) {}
     }
 
