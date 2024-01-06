@@ -88,7 +88,7 @@ abstract contract DNSResolver is
         override
         returns (bytes memory)
     {
-        bytes memory response = _read(DNS_RESOLVER_SCHEMA_RECORDS, abi.encode(name, resource));
+        bytes memory response = _read(DNS_RESOLVER_SCHEMA_RECORDS, abi.encode(node, name, resource));
         if (response.length == 0) {
             return "";
         }
@@ -96,7 +96,7 @@ abstract contract DNSResolver is
     }
 
     function dnsRecordsCount(bytes32 node, bytes32 name) public view virtual returns (uint16) {
-        bytes memory response = _read(DNS_RESOLVER_SCHEMA_COUNT, abi.encode(name));
+        bytes memory response = _read(DNS_RESOLVER_SCHEMA_COUNT, abi.encode(node, name));
         if (response.length == 0) {
             return 0;
         }

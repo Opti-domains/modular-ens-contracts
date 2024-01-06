@@ -21,6 +21,7 @@ contract OptiResolverEAS is OptiResolverAttesterBase {
         bytes32 uid;
 
         assembly {
+            // Fetch UID from the storage slot
             uid := sload(s)
         }
 
@@ -53,16 +54,53 @@ contract OptiResolverEAS is OptiResolverAttesterBase {
     function _write(
         bytes32 schema,
         address recipient,
-        uint256 expiration,
+        uint64 expiration,
         bool revocable,
         bytes memory header,
         bytes memory body
-    ) internal virtual override returns (bytes32) {}
+    ) internal virtual override returns (bytes32 uid) {
+        bytes32 s = keccak256(abi.encode(RESOLVER_STORAGE_NAMESPACE, schema, recipient, header));
+
+        uid = IEAS(EAS).attest(
+            AttestationRequest({
+                schema: schema,
+                data: AttestationRequestData({
+                    recipient: recipient,
+                    expirationTime: expiration,
+                    revocable: revocable,
+                    refUID: bytes32(0),
+                    data: bytes.concat(header, body),
+                    value: 0
+                })
+            })
+        );
+
+        assembly {
+            // Store UID to the storage slot
+            sstore(s, uid)
+        }
+
+        emit ResolverWrite(schema, recipient, uid, expiration, revocable, header, body);
+    }
 
     function _revoke(bytes32 schema, address recipient, bytes memory header)
         internal
         virtual
         override
-        returns (bytes32)
-    {}
+        returns (bytes32 uid)
+    {
+        bytes32 s = keccak256(abi.encode(RESOLVER_STORAGE_NAMESPACE, schema, recipient, header));
+
+        assembly {
+            // Fetch UID from the storage slot
+            uid := sload(s)
+
+            // Clear UID from the storage slot
+            sstore(s, 0)
+        }
+
+        IEAS(EAS).revoke(RevocationRequest({schema: schema, data: RevocationRequestData({uid: uid, value: 0})}));
+
+        emit ResolverRevoke(schema, recipient, uid, header);
+    }
 }
