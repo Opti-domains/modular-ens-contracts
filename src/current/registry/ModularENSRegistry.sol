@@ -2,6 +2,7 @@
 pragma solidity ^0.8.8;
 
 import "./ModularENS.sol";
+import "@ensdomains/ens-contracts/utils/NameEncoder.sol";
 
 contract ModularENSRegistry is ModularENS {
     error NotRegistrar();
@@ -42,37 +43,63 @@ contract ModularENSRegistry is ModularENS {
 
     // ============= Getter functions =============
 
-    function expiration(bytes32 node) external returns (uint256) {
+    function expiration(bytes32 node) public view returns (uint256) {
         return records[node].expiration;
     }
 
-    function parentNode(bytes32 node) external returns (bytes32) {
+    function parentNode(bytes32 node) public view returns (bytes32) {
         return records[node].parentNode;
     }
 
-    function tldNode(bytes32 node) external returns (bytes32) {
+    function tldNode(bytes32 node) public view returns (bytes32) {
         return records[node].tldNode;
     }
 
-    function tld(bytes32 tldHash) external returns (TLD memory) {
+    function tld(bytes32 tldHash) public view returns (TLD memory) {
         return _tld[tldHash];
     }
 
-    function merkleIndex(bytes32 node) external returns (uint256) {
+    function merkleIndex(bytes32 node) public view returns (uint256) {
         return records[node].merkleIndex;
     }
 
     // TODO
-    function merkleRoot(bytes32 tldHash, uint256 index) external returns (bytes32) {
+    function merkleRoot(bytes32 tldHash, uint256 index) public view returns (bytes32) {
         return bytes32(0);
     }
 
-    function name(bytes32 node) external returns (string memory) {
+    function name(bytes32 node) public view returns (string memory) {
         return records[node].name;
     }
 
-    function dnsEncoded(bytes32 node) external returns (bytes memory) {
-        
+    function dnsEncoded(bytes32 node) public view returns (bytes memory dnsName) {
+        (dnsName,) = NameEncoder.dnsEncodeName(records[node].name);
+    }
+
+    // ============= Write functions =============
+
+    function register(bytes32 parentNode, string memory label, address owner, uint256 expiration, uint64 ttl)
+        external
+        onlyRegistrar(parentNode)
+        returns (bytes32)
+    {
+        bytes32 namehash = keccak256(abi.encodePacked(parentNode, keccak256(abi.encodePacked(label))));
+
+        // TODO: Deploy resolver
+        address resolver = address(this);
+
+        records[namehash] = Record({
+            owner: owner,
+            resolver: resolver,
+            ttl: ttl,
+            expiration: expiration,
+            parentNode: parentNode,
+            tldNode: tldNode(parentNode),
+            merkleIndex: 0, // TODO
+            name: string.concat(label, ".", name(parentNode))
+        });
+
+        // TODO: Emit event!
     }
 
     // ============= ENS Compatibility functions =============
@@ -179,6 +206,10 @@ contract ModularENSRegistry is ModularENS {
      * @return address of the owner.
      */
     function owner(bytes32 node) public view virtual override returns (address) {
+        if (block.timestamp > records[node].expiration && records[node].expiration != 0) {
+            return address(0);
+        }
+
         address addr = records[node].owner;
         if (addr == address(this)) {
             return address(0x0);
@@ -193,6 +224,9 @@ contract ModularENSRegistry is ModularENS {
      * @return address of the resolver.
      */
     function resolver(bytes32 node) public view virtual override returns (address) {
+        if (block.timestamp > records[node].expiration && records[node].expiration != 0) {
+            return address(0);
+        }
         return records[node].resolver;
     }
 
