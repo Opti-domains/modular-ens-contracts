@@ -2,7 +2,7 @@
 pragma solidity ^0.8.8;
 
 import "@ensdomains/ens-contracts/registry/ENS.sol";
-import "src/resolver/attester/OptiResolverAttesterBase.sol";
+import "./OptiResolverAttesterBase.sol";
 
 // TODO
 address constant ENS_REGISTRY = 0x0000000000000000000000000000000000000000;

@@ -3,7 +3,7 @@
 pragma solidity ^0.8.8;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
-import "src/diamond/interfaces/IDiamondCloneFactory.sol";
+import "./interfaces/IDiamondCloneFactory.sol";
 
 interface IDiamondResolverInitialize {
     function initialize(address _owner, address _fallback) external;

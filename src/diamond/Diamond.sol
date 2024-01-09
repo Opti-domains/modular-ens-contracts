@@ -11,8 +11,8 @@ import {DiamondReadable, IDiamondReadable} from "@solidstate/contracts/proxy/dia
 import {DiamondWritable, IDiamondWritable} from "@solidstate/contracts/proxy/diamond/writable/DiamondWritable.sol";
 import {ISolidStateDiamond, IERC165} from "@solidstate/contracts/proxy/diamond/ISolidStateDiamond.sol";
 import {ERC165BaseInternal} from "@solidstate/contracts/introspection/ERC165/base/ERC165BaseInternal.sol";
-import "src/diamond/DiamondBaseExtendable.sol";
-import "src/diamond/DiamondCloneFactory.sol";
+import "./DiamondBaseExtendable.sol";
+import "./DiamondCloneFactory.sol";
 
 /**
  * @title extended from SolidState "Diamond" proxy reference implementation

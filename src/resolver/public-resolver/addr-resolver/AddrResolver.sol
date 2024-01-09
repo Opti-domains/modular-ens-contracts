@@ -2,10 +2,10 @@
 pragma solidity >=0.8.4;
 
 import {IERC165} from "@solidstate/contracts/interfaces/IERC165.sol";
-import "src/resolver/attester/OptiResolverAttester.sol";
-import "src/resolver/auth/OptiResolverAuth.sol";
-import "src/resolver/public-resolver/addr-resolver/IAddrResolver.sol";
-import "src/resolver/public-resolver/addr-resolver/IAddressResolver.sol";
+import "../../attester/OptiResolverAttester.sol";
+import "../../auth/OptiResolverAuth.sol";
+import "./IAddrResolver.sol";
+import "./IAddressResolver.sol";
 
 bytes32 constant ADDR_RESOLVER_SCHEMA =
     keccak256(abi.encodePacked("bytes32 node,uint256 coinType,bytes address", address(0), true));

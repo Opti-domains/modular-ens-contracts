@@ -2,7 +2,7 @@
 pragma solidity ^0.8.8;
 
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import "src/patcher/Patcher.sol";
+import "./Patcher.sol";
 
 interface PatcherInitialize {
     function initialize(address _owner) external;

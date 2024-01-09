@@ -3,10 +3,10 @@ pragma solidity >=0.8.4;
 
 import {IERC165} from "@solidstate/contracts/interfaces/IERC165.sol";
 import "@ensdomains/ens-contracts/dnssec-oracle/RRUtils.sol";
-import "src/resolver/attester/OptiResolverAttester.sol";
-import "src/resolver/auth/OptiResolverAuth.sol";
-import "src/resolver/public-resolver/dns-resolver/IDNSRecordResolver.sol";
-import "src/resolver/public-resolver/dns-resolver/IDNSZoneResolver.sol";
+import "../../attester/OptiResolverAttester.sol";
+import "../../auth/OptiResolverAuth.sol";
+import "./IDNSRecordResolver.sol";
+import "./IDNSZoneResolver.sol";
 
 bytes32 constant DNS_RESOLVER_SCHEMA_ZONEHASHES =
     keccak256(abi.encodePacked("bytes32 node,bytes zonehashes", address(0), true));

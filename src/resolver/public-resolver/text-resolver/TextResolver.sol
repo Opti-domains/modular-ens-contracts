@@ -2,9 +2,9 @@
 pragma solidity >=0.8.4;
 
 import {IERC165} from "@solidstate/contracts/interfaces/IERC165.sol";
-import "src/resolver/attester/OptiResolverAttester.sol";
-import "src/resolver/auth/OptiResolverAuth.sol";
-import "src/resolver/public-resolver/text-resolver/ITextResolver.sol";
+import "../../attester/OptiResolverAttester.sol";
+import "../../auth/OptiResolverAuth.sol";
+import "./ITextResolver.sol";
 
 bytes32 constant TEXT_RESOLVER_SCHEMA =
     keccak256(abi.encodePacked("bytes32 node,string key,string value", address(0), true));

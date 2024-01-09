@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.4;
 
-import "src/resolver/public-resolver/addr-resolver/AddrResolver.sol";
-import "src/resolver/public-resolver/interface-resolver/IInterfaceResolver.sol";
+import "../../public-resolver/addr-resolver/AddrResolver.sol";
+import "./IInterfaceResolver.sol";
 
 bytes32 constant INTERFACE_RESOLVER_SCHEMA =
     keccak256(abi.encodePacked("bytes32 node,bytes4 interfaceID,address implementer", address(0), true));

@@ -3,7 +3,7 @@
 pragma solidity ^0.8.8;
 
 import "@ensdomains/ens-contracts/registry/ENS.sol";
-import "src/resolver/attester/OptiResolverAttesterBase.sol";
+import "./OptiResolverAttesterBase.sol";
 
 abstract contract OptiResolverAttesterNoRecipient is OptiResolverAttesterBase {
     function _read(bytes32 schema, bytes memory header) internal view virtual returns (bytes memory) {

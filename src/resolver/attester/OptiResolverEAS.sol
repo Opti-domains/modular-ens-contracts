@@ -2,7 +2,7 @@
 pragma solidity ^0.8.8;
 
 import "@ethereum-attestation-service/eas-contracts/contracts/IEAS.sol";
-import "src/resolver/attester/OptiResolverAttesterBase.sol";
+import "./OptiResolverAttesterBase.sol";
 
 bytes32 constant RESOLVER_STORAGE_NAMESPACE = keccak256("optidomains.resolver.storage");
 

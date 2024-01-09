@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import "@openzeppelin/contracts/utils/StorageSlot.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "src/patcher/DummyContract.sol";
+import "./DummyContract.sol";
 
 /**
  * @title Patcher
