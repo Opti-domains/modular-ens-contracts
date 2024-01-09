@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import "@openzeppelin/contracts/utils/StorageSlot.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "src/Semver.sol";
 import "./DummyContract.sol";
 
 /**
@@ -20,7 +21,7 @@ import "./DummyContract.sol";
  * 2. Deploy proxies with deterministic address
  * 3. Set proxies implementation
  */
-contract Patcher is OwnableUpgradeable {
+contract Patcher is OwnableUpgradeable, Semver {
     DummyContract internal immutable dummyContract;
     ProxyAdmin public proxyAdmin;
     uint256 public latestNonce;
@@ -38,7 +39,7 @@ contract Patcher is OwnableUpgradeable {
     event ImplementationSet(bytes32 indexed patchHash, address indexed target, address indexed implementation);
     event ActionExecuted(bytes32 indexed patchHash, address indexed target, bytes data);
 
-    constructor() {
+    constructor() Semver(1, 0, 0) {
         dummyContract = new DummyContract();
     }
 
