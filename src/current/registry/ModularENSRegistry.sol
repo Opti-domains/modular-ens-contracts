@@ -2,6 +2,7 @@
 pragma solidity ^0.8.8;
 
 import "./ModularENS.sol";
+import "../merkle/MerkleForest.sol";
 import "@ensdomains/ens-contracts/utils/NameEncoder.sol";
 
 contract ModularENSRegistry is ModularENS {
@@ -22,6 +23,7 @@ contract ModularENSRegistry is ModularENS {
     mapping(bytes32 => Record) records;
     mapping(address => mapping(address => bool)) operators;
     mapping(bytes32 => TLD) _tld;
+    mapping(bytes32 => bool) public isRootFraud;
 
     uint256[500] private __gap;
 
