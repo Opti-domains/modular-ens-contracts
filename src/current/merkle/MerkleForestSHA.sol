@@ -69,18 +69,20 @@ contract MerkleForestSHA {
      * @return slot - the index of the frontier (or 'storage slot') into which we will next store a nodeValue
      */
     function getFrontierSlot(uint256 leafIndex) private pure returns (uint256 slot) {
-        slot = 0;
-        if (leafIndex % 2 == 1) {
-            uint256 exp1 = 1;
-            uint256 pow1 = 2;
-            uint256 pow2 = pow1 << 1;
-            while (slot == 0) {
-                if ((leafIndex + 1 - pow1) % pow2 == 0) {
-                    slot = exp1;
-                } else {
-                    pow1 = pow2;
-                    pow2 = pow2 << 1;
-                    exp1++;
+        unchecked {
+            slot = 0;
+            if (leafIndex % 2 == 1) {
+                uint256 exp1 = 1;
+                uint256 pow1 = 2;
+                uint256 pow2 = pow1 << 1;
+                while (slot == 0) {
+                    if ((leafIndex + 1 - pow1) % pow2 == 0) {
+                        slot = exp1;
+                    } else {
+                        pow1 = pow2;
+                        pow2 = pow2 << 1;
+                        exp1++;
+                    }
                 }
             }
         }

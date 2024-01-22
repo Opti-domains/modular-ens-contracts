@@ -15,8 +15,8 @@ contract DiamondCloneFactory is IDiamondCloneFactory {
     /**
      * Clone DiamondResolver to customize your own resolver
      */
-    function clone(bytes32 salt) public {
-        address newResolver = Clones.cloneDeterministic(address(this), keccak256(abi.encodePacked(msg.sender, salt)));
+    function clone(bytes32 salt) public returns (address newResolver) {
+        newResolver = Clones.cloneDeterministic(address(this), keccak256(abi.encodePacked(msg.sender, salt)));
         IDiamondResolverInitialize(newResolver).initialize(msg.sender, address(this));
         emit CloneDiamond(msg.sender, newResolver);
     }

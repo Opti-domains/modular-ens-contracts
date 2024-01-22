@@ -7,20 +7,37 @@ interface ModularENS is ENS {
     struct TLD {
         uint256 chainId;
         bytes32 nameHash;
-        bytes32 tldHash;
         address registrar;
+        string name;
     }
 
-    function register(bytes32 parentNode, string memory label, address owner, uint256 expiration, uint64 ttl)
-        external
-        returns (bytes32);
+    struct Record {
+        address owner;
+        address resolver;
+        uint64 ttl;
+        uint256 expiration;
+        uint256 fuses;
+        bytes32 parentNode;
+        bytes32 tldNode;
+        uint256 nonce;
+        string name;
+    }
+
+    function registerTLD(TLD memory tld) external;
+
+    function register(
+        bytes32 parentNode,
+        string memory label,
+        address owner,
+        uint256 expiration,
+        uint256 fuses,
+        uint64 ttl
+    ) external returns (bytes32);
 
     function expiration(bytes32 node) external view returns (uint256);
     function parentNode(bytes32 node) external view returns (bytes32);
     function tldNode(bytes32 node) external view returns (bytes32);
     function tld(bytes32 tldHash) external view returns (TLD memory);
-    function merkleIndex(bytes32 node) external view returns (uint256);
-    function merkleRoot(bytes32 tldHash, uint256 index) external view returns (bytes32);
 
     function name(bytes32 node) external view returns (string memory);
     function dnsEncoded(bytes32 node) external view returns (bytes memory);
