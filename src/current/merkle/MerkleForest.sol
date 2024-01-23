@@ -8,13 +8,21 @@ pragma solidity ^0.8.8;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./MerkleForestSHA.sol";
 
-error InvalidRootTimestamp();
-
 contract MerkleForest is MerkleForestSHA, OwnableUpgradeable {
-    mapping(bytes32 => bytes32[]) public roots;
-    mapping(bytes32 => uint256[]) public timestamps;
+    struct MerkleRoot {
+        bytes32 root;
+        uint256 timestamp;
+        uint256 nonce;
+    }
 
-    event NewRoot(bytes32 indexed treeId, bytes32 root, uint256 timestamp, uint256 index);
+    mapping(bytes32 => mapping(uint256 => MerkleRoot)) roots;
+    mapping(bytes32 => uint256) public latestNonce;
+    mapping(bytes32 => bool) public isRestored;
+
+    error NonceOutdated();
+    error EitherInsertOrRestore();
+
+    event NewRoot(bytes32 indexed treeId, bytes32 indexed root, uint256 indexed nonce, uint256 timestamp);
 
     function initialize() public initializer {
         __Ownable_init();
@@ -24,31 +32,29 @@ contract MerkleForest is MerkleForestSHA, OwnableUpgradeable {
      * @notice Append a leaf to the tree
      * @param leafValue - the value of the leaf being inserted.
      */
-    function insertLeaf(bytes32 treeId, bytes32 leafValue) external onlyOwner returns (bytes32 root) {
+    function insertLeaf(bytes32 treeId, bytes32 leafValue) external onlyOwner returns (bytes32 root, uint256 nonce) {
+        if (isRestored[treeId]) revert EitherInsertOrRestore();
+
         root = _insertLeaf(leafValue, treeId); // recalculate the root of the tree
-        roots[treeId].push(root);
-        timestamps[treeId].push(block.timestamp);
-        emit NewRoot(treeId, root, block.timestamp, roots[treeId].length - 1);
+        nonce = latestNonce[treeId]++;
+
+        roots[treeId][nonce] = MerkleRoot({root: root, timestamp: block.timestamp, nonce: nonce});
+        latestNonce[treeId] = nonce;
+
+        emit NewRoot(treeId, root, nonce, block.timestamp);
     }
 
-    /**
-     * @notice Append leaves to the tree
-     * @param leafValues - the values of the leaves being inserted.
-     */
-    function insertLeaves(bytes32 treeId, bytes32[] calldata leafValues) external onlyOwner returns (bytes32 root) {
-        root = _insertLeaves(leafValues, treeId); // recalculate the root of the tree
-        roots[treeId].push(root);
-        timestamps[treeId].push(block.timestamp);
-        emit NewRoot(treeId, root, block.timestamp, roots[treeId].length - 1);
-    }
+    function restoreRoot(bytes32 treeId, bytes32 root, uint256 timestamp, uint256 nonce) external onlyOwner {
+        if (!isRestored[treeId] && latestNonce[treeId] > 0) revert EitherInsertOrRestore();
 
-    function restoreRoot(bytes32 treeId, bytes32 root, uint256 timestamp) external onlyOwner {
-        if (timestamps[treeId].length == 0 || timestamp >= timestamps[treeId][timestamps[treeId].length - 1]) {
-            roots[treeId].push(root);
-            timestamps[treeId].push(timestamp);
-            emit NewRoot(treeId, root, timestamp, roots[treeId].length - 1);
+        if (!isRestored[treeId] || nonce > latestNonce[treeId]) {
+            roots[treeId][nonce] = MerkleRoot({root: root, timestamp: timestamp, nonce: nonce});
+            latestNonce[treeId] = nonce;
+            isRestored[treeId] = true;
+
+            emit NewRoot(treeId, root, nonce, timestamp);
         } else {
-            revert InvalidRootTimestamp();
+            revert NonceOutdated();
         }
     }
 }

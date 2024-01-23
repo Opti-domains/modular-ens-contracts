@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.8;
 
-import "@ensdomains/ens-contracts/registry/ENS.sol";
+import "./ENSReadOnly.sol";
 
-interface ModularENS is ENS {
+interface ModularENS is ENSReadOnly {
     struct TLD {
         uint256 chainId;
         bytes32 nameHash;
@@ -16,23 +16,39 @@ interface ModularENS is ENS {
         address resolver;
         uint64 ttl;
         uint256 expiration;
-        uint256 fuses;
         bytes32 parentNode;
         bytes32 tldNode;
         uint256 nonce;
         string name;
+        bytes data;
     }
+
+    // Core registration functions
 
     function registerTLD(TLD memory tld) external;
 
     function register(
         bytes32 parentNode,
-        string memory label,
         address owner,
         uint256 expiration,
-        uint256 fuses,
-        uint64 ttl
-    ) external returns (bytes32);
+        uint64 ttl,
+        string memory label,
+        bytes memory data
+    ) external returns (bytes32, bytes32, uint256);
+
+    function update(bytes32 _node, address _owner, uint256 _expiration, uint64 _ttl)
+        external
+        returns (bytes32, uint256);
+
+    // Single update functions
+
+    function setOwner(bytes32 node, address owner) external;
+    function setExpiration(bytes32 node, uint64 expiration) external;
+    function setTTL(bytes32 node, uint64 ttl) external;
+    function setData(bytes32 node, bytes memory data) external;
+
+    function setApprovalForAll(address operator, bool approved) external;
+    function isApprovedForAll(address owner, address operator) external view returns (bool);
 
     function expiration(bytes32 node) external view returns (uint256);
     function parentNode(bytes32 node) external view returns (bytes32);

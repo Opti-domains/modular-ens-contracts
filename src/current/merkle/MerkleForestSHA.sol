@@ -198,10 +198,8 @@ contract MerkleForestSHA {
                 uint256 numberOfExcessLeaves = numberOfLeaves - (treeWidth - leafCount);
                 // remove the excess leaves, because we only want to emit those we've added as an event:
                 for (uint256 xs = 0; xs < numberOfExcessLeaves; xs++) {
-                    /**
-                     * CAUTION!!! This attempts to succinctly achieve leafValues.pop() on a **memory** dynamic array. Not thoroughly tested!
-                     *                 Credit: https://ethereum.stackexchange.com/a/51897/45916
-                     */
+                    // CAUTION: This attempts to succinctly achieve leafValues.pop() on a **memory** dynamic array. Not thoroughly tested!
+                    // Credit: https://ethereum.stackexchange.com/a/51897/45916
                     assembly {
                         mstore(leafValues, sub(mload(leafValues), 1))
                     }
