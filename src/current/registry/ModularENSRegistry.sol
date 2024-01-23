@@ -80,6 +80,10 @@ contract ModularENSRegistry is ModularENS {
         }
     }
 
+    function record(bytes32 node) external view returns (Record memory) {
+        return records[node];
+    }
+
     function parentNode(bytes32 node) public view returns (bytes32) {
         return records[node].parentNode;
     }
@@ -90,6 +94,10 @@ contract ModularENSRegistry is ModularENS {
 
     function tld(bytes32 tldHash) public view returns (TLD memory) {
         return _tld[tldHash];
+    }
+
+    function data(bytes32 node) public view returns (bytes memory) {
+        return records[node].data;
     }
 
     function name(bytes32 node) public view returns (string memory) {

@@ -50,10 +50,15 @@ interface ModularENS is ENSReadOnly {
     function setApprovalForAll(address operator, bool approved) external;
     function isApprovedForAll(address owner, address operator) external view returns (bool);
 
+    // Getter functions
+
+    function record(bytes32 node) external view returns (Record memory);
+
     function expiration(bytes32 node) external view returns (uint256);
     function parentNode(bytes32 node) external view returns (bytes32);
     function tldNode(bytes32 node) external view returns (bytes32);
     function tld(bytes32 tldHash) external view returns (TLD memory);
+    function data(bytes32 node) external view returns (bytes memory);
 
     function name(bytes32 node) external view returns (string memory);
     function dnsEncoded(bytes32 node) external view returns (bytes memory);
