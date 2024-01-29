@@ -46,12 +46,13 @@ contract MerkleForestSHA {
     event NewLeaf(uint256 leafIndex, bytes32 leafValue, bytes32 root);
     event NewLeaves(uint256 minLeafIndex, bytes32[] leafValues, bytes32 root);
 
-    // event Output(bytes27 leftInput, bytes27 rightInput, bytes32 output, uint nodeIndex); // for debugging only
+    // event Output(bytes32 leftInput, bytes32 rightInput, bytes32 output, uint nodeIndex); // for debugging only
 
-    mapping(bytes32 => bytes27[32]) frontierForest; // the right-most 'frontier' of nodes required to calculate the new root when the next new leaf value is added.
+    mapping(bytes32 => bytes32[32]) frontierForest; // the right-most 'frontier' of nodes required to calculate the new root when the next new leaf value is added.
     mapping(bytes32 => uint256) public leafCountForest; // the number of leaves currently in the tree
 
-    uint256 public constant treeHeight = 32;
+    // Support 1 trillion domains
+    uint256 public constant treeHeight = 40;
     uint256 public constant treeWidth = 2 ** treeHeight; // 2 ** treeHeight
 
     /**
@@ -62,7 +63,7 @@ contract MerkleForestSHA {
      * 27 bytes * 2 inputs to sha() = 54 byte input to sha(). 54 = 0x36.
      * If in future you want to change the truncation values, search for '27', '40' and '0x36'.
      */
-    bytes27 constant zero = 0x000000000000000000000000000000000000000000000000000000;
+    bytes32 constant zero = 0x000000000000000000000000000000000000000000000000000000;
 
     /**
      * @notice Get the index of the frontier (or 'storage slot') into which we will next store a nodeValue (based on the leafIndex currently being inserted). See the top-level README for a detailed explanation.
@@ -96,17 +97,17 @@ contract MerkleForestSHA {
     function _insertLeaf(bytes32 leafValue, bytes32 treeId) internal returns (bytes32 root) {
         unchecked {
             uint256 leafCount = leafCountForest[treeId];
-            bytes27[32] storage frontier = frontierForest[treeId];
+            bytes32[32] storage frontier = frontierForest[treeId];
 
             // check that space exists in the tree:
             require(treeWidth > leafCount, "There is no space left in the tree.");
 
             uint256 slot = getFrontierSlot(leafCount);
             uint256 nodeIndex = leafCount + treeWidth - 1;
-            bytes27 nodeValue = bytes27(leafValue << 40); // nodeValue is the hash, which iteratively gets overridden to the top of the tree until it becomes the root.
+            bytes32 nodeValue = leafValue; // nodeValue is the hash, which iteratively gets overridden to the top of the tree until it becomes the root.
 
-            bytes27 leftInput;
-            bytes27 rightInput;
+            bytes32 leftInput;
+            bytes32 rightInput;
             bytes32[1] memory output; // output of the hash function
             bool success;
 
@@ -135,14 +136,14 @@ contract MerkleForestSHA {
                         // define pointer
                         let input := mload(0x40) // 0x40 is always the free memory pointer. Don't change this.
                         mstore(input, leftInput) // push first input
-                        mstore(add(input, 0x1b), rightInput) // push second input at position 27bytes = 0x1b
-                        success := staticcall(not(0), 2, input, 0x36, output, 0x20)
+                        mstore(add(input, 0x20), rightInput) // push second input at position 32bytes = 0x20
+                        success := staticcall(not(0), 2, input, 0x40, output, 0x20)
                         // Use "invalid" to make gas estimation work
                         switch success
                         case 0 { invalid() }
                     }
 
-                    nodeValue = bytes27(output[0] << 40); // the parentValue, but will become the nodeValue of the next level
+                    nodeValue = output[0]; // the parentValue, but will become the nodeValue of the next level
                     nodeIndex = (nodeIndex - 1) / 2; // move one row up the tree
 
                     // emit Output(leftInput, rightInput, output[0], nodeIndex); // for debugging only
@@ -156,14 +157,14 @@ contract MerkleForestSHA {
                         // define pointer
                         let input := mload(0x40) // 0x40 is always the free memory pointer. Don't change this.
                         mstore(input, leftInput) // push first input
-                        mstore(add(input, 0x1b), rightInput) // push second input at position 27bytes = 0x1b
-                        success := staticcall(not(0), 2, input, 0x36, output, 0x20)
+                        mstore(add(input, 0x20), rightInput) // push second input at position 32bytes = 0x20
+                        success := staticcall(not(0), 2, input, 0x40, output, 0x20)
                         // Use "invalid" to make gas estimation work
                         switch success
                         case 0 { invalid() }
                     }
 
-                    nodeValue = bytes27(output[0] << 40); // the parentValue, but will become the nodeValue of the next level
+                    nodeValue = output[0]; // the parentValue, but will become the nodeValue of the next level
                     nodeIndex = nodeIndex / 2; // move one row up the tree
 
                     // emit Output(leftInput, rightInput, output[0], nodeIndex); // for debugging only
@@ -188,7 +189,7 @@ contract MerkleForestSHA {
     function _insertLeaves(bytes32[] memory leafValues, bytes32 treeId) internal returns (bytes32 root) {
         unchecked {
             uint256 leafCount = leafCountForest[treeId];
-            bytes27[32] storage frontier = frontierForest[treeId];
+            bytes32[32] storage frontier = frontierForest[treeId];
 
             uint256 numberOfLeaves = leafValues.length;
 
@@ -209,18 +210,18 @@ contract MerkleForestSHA {
 
             uint256 slot;
             uint256 nodeIndex;
-            bytes27 nodeValue;
+            bytes32 nodeValue;
 
-            bytes27 leftInput;
-            bytes27 rightInput;
+            bytes32 leftInput;
+            bytes32 rightInput;
             bytes32[1] memory output; // the output of the hash
             bool success;
 
-            bytes27[32] memory tempFrontier = frontier;
+            bytes32[32] memory tempFrontier = frontier;
 
             // consider each new leaf in turn, from left to right:
             for (uint256 leafIndex = leafCount; leafIndex < leafCount + numberOfLeaves; leafIndex++) {
-                nodeValue = bytes27(leafValues[leafIndex - leafCount] << 40);
+                nodeValue = leafValues[leafIndex - leafCount];
                 nodeIndex = leafIndex + treeWidth - 1; // convert the leafIndex to a nodeIndex
 
                 slot = getFrontierSlot(leafIndex); // determine at which level we will next need to store a nodeValue
@@ -242,8 +243,8 @@ contract MerkleForestSHA {
                             // define pointer
                             let input := mload(0x40) // 0x40 is always the free memory pointer. Don't change this.
                             mstore(input, leftInput) // push first input
-                            mstore(add(input, 0x1b), rightInput) // push second input at position 27bytes = 0x1b
-                            success := staticcall(not(0), 2, input, 0x36, output, 0x20)
+                            mstore(add(input, 0x20), rightInput) // push second input at position 32bytes = 0x20
+                            success := staticcall(not(0), 2, input, 0x40, output, 0x20)
                             // Use "invalid" to make gas estimation work
                             switch success
                             case 0 { invalid() }
@@ -251,7 +252,7 @@ contract MerkleForestSHA {
 
                         // emit Output(leftInput, rightInput, output[0], level, nodeIndex); // for debugging only
 
-                        nodeValue = bytes27(output[0] << 40); // the parentValue, but will become the nodeValue of the next level
+                        nodeValue = output[0]; // the parentValue, but will become the nodeValue of the next level
                         nodeIndex = (nodeIndex - 1) / 2; // move one row up the tree
                     } else {
                         // odd nodeIndex
@@ -262,8 +263,8 @@ contract MerkleForestSHA {
                             // define pointer
                             let input := mload(0x40) // 0x40 is always the free memory pointer. Don't change this.
                             mstore(input, leftInput) // push first input
-                            mstore(add(input, 0x1b), rightInput) // push second input at position 27bytes = 0x1b
-                            success := staticcall(not(0), 2, input, 0x36, output, 0x20)
+                            mstore(add(input, 0x20), rightInput) // push second input at position 32bytes = 0x20
+                            success := staticcall(not(0), 2, input, 0x40, output, 0x20)
                             // Use "invalid" to make gas estimation work
                             switch success
                             case 0 { invalid() }
@@ -271,7 +272,7 @@ contract MerkleForestSHA {
 
                         // emit Output(leftInput, rightInput, output[0], level, nodeIndex); // for debugging only
 
-                        nodeValue = bytes27(output[0] << 40); // the parentValue, but will become the nodeValue of the next level
+                        nodeValue = output[0]; // the parentValue, but will become the nodeValue of the next level
                         nodeIndex = nodeIndex / 2; // the parentIndex, but will become the nodeIndex of the next level
                     }
                 }
@@ -297,8 +298,8 @@ contract MerkleForestSHA {
                         // define pointer
                         let input := mload(0x40) // 0x40 is always the free memory pointer. Don't change this.
                         mstore(input, leftInput) // push first input
-                        mstore(add(input, 0x1b), rightInput) // push second input at position 27bytes = 0x1b
-                        success := staticcall(not(0), 2, input, 0x36, output, 0x20)
+                        mstore(add(input, 0x20), rightInput) // push second input at position 32bytes = 0x20
+                        success := staticcall(not(0), 2, input, 0x40, output, 0x20)
                         // Use "invalid" to make gas estimation work
                         switch success
                         case 0 { invalid() }
@@ -306,7 +307,7 @@ contract MerkleForestSHA {
 
                     // emit Output(leftInput, rightInput, output[0], level, nodeIndex); // for debugging only
 
-                    nodeValue = bytes27(output[0] << 40); // the parentValue, but will become the nodeValue of the next level
+                    nodeValue = output[0]; // the parentValue, but will become the nodeValue of the next level
                     nodeIndex = (nodeIndex - 1) / 2; // the parentIndex, but will become the nodeIndex of the next level
                 } else {
                     // odd nodeIndex
@@ -317,8 +318,8 @@ contract MerkleForestSHA {
                         // define pointer
                         let input := mload(0x40) // 0x40 is always the free memory pointer. Don't change this.
                         mstore(input, leftInput) // push first input
-                        mstore(add(input, 0x1b), rightInput) // push second input at position 27bytes = 0x1b
-                        success := staticcall(not(0), 2, input, 0x36, output, 0x20)
+                        mstore(add(input, 0x20), rightInput) // push second input at position 32bytes = 0x20
+                        success := staticcall(not(0), 2, input, 0x40, output, 0x20)
                         // Use "invalid" to make gas estimation work
                         switch success
                         case 0 { invalid() }
@@ -326,7 +327,7 @@ contract MerkleForestSHA {
 
                     // emit Output(leftInput, rightInput, output[0], level, nodeIndex); // for debugging only
 
-                    nodeValue = bytes27(output[0] << 40); // the parentValue, but will become the nodeValue of the next level
+                    nodeValue = output[0]; // the parentValue, but will become the nodeValue of the next level
                     nodeIndex = nodeIndex / 2; // the parentIndex, but will become the nodeIndex of the next level
                 }
             }
