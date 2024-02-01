@@ -8,6 +8,7 @@ interface ModularENS is ENSReadOnly {
         uint256 chainId;
         bytes32 nameHash;
         address registrar;
+        address resolver;
         string name;
     }
 
@@ -43,7 +44,7 @@ interface ModularENS is ENSReadOnly {
     // Single update functions
 
     function setOwner(bytes32 node, address owner) external;
-    function setExpiration(bytes32 node, uint64 expiration) external;
+    function setExpiration(bytes32 node, uint256 expiration) external;
     function setTTL(bytes32 node, uint64 ttl) external;
     function setData(bytes32 node, bytes memory data) external;
 

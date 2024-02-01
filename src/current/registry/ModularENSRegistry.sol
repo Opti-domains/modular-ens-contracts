@@ -4,6 +4,7 @@ pragma solidity ^0.8.8;
 import "./ModularENS.sol";
 import "../merkle/MerkleForest.sol";
 import "../diamond/interfaces/IDiamondCloneFactory.sol";
+import "../registrar/IRegistrarHook.sol";
 import "@ensdomains/ens-contracts/utils/NameEncoder.sol";
 
 contract ModularENSRegistry is ModularENS {
@@ -21,7 +22,9 @@ contract ModularENSRegistry is ModularENS {
     error NotRoot();
     error NotRegistrar();
     error NotRegistered();
-    error SetResolverRestricted();
+    error AlreadyRegistered();
+    error RegistrarNotDeployed();
+    error ResolverRequired();
     error NotPrimaryChain();
     error BadTLD();
     error Impossible();
@@ -176,22 +179,30 @@ contract ModularENSRegistry is ModularENS {
         nodeMerkleRoot[_nameHash] = _merkleRoot;
     }
 
+    function _sendHook(bytes32 _nameHash, Record memory _record) internal {
+        // Send hook
+        address _registrar = _tld[_record.tldNode].registrar;
+        if (_registrar.code.length > 0) {
+            IRegistrarHook(_registrar).updateRecord(_nameHash, _record);
+        } else if (_registrar != address(0)) {
+            revert RegistrarNotDeployed();
+        }
+    }
+
     function registerTLD(TLD memory _tldObj) public onlyRoot {
         bytes32 _tldNode = sha256(abi.encode(_tldObj.chainId, _tldObj.nameHash));
         bytes32 _nameHash = keccak256(abi.encodePacked(bytes32(0), keccak256(abi.encodePacked(_tldObj.name))));
 
-        if (_tld[_tldNode].nameHash != bytes32(0) || _nameHash != _tld[_tldNode].nameHash) {
+        if (_tld[_tldNode].nameHash != bytes32(0) || _nameHash != _tldObj.nameHash || _tldObj.resolver == address(0)) {
             revert BadTLD();
         }
 
         _tld[_tldNode] = _tldObj;
 
-        address _resolver = baseResolver.clone(_nameHash);
-
         // Create a TLD record
         Record memory _record = Record({
             owner: _tldObj.registrar,
-            resolver: _resolver,
+            resolver: _tldObj.resolver,
             ttl: 0,
             expiration: 0,
             parentNode: bytes32(0),
@@ -240,6 +251,9 @@ contract ModularENSRegistry is ModularENS {
         (_merkleRoot, _nonce) =
             _updateMerkle(_nameHash, _recordHash, _record.tldNode, _record.parentNode, _record.nonce);
 
+        // Send hook
+        _sendHook(_nameHash, _record);
+
         // Emit RecordChanged event
         emit RecordChanged(_record.tldNode, _nameHash, _owner, _merkleRoot, _record);
     }
@@ -256,7 +270,7 @@ contract ModularENSRegistry is ModularENS {
         _nameHash = keccak256(abi.encodePacked(_parentNode, _labelHash));
 
         if (records[_nameHash].resolver != address(0)) {
-            update(_nameHash, _owner, _expiration, _ttl);
+            revert AlreadyRegistered();
         } else {
             bytes32 _tldNode = tldNode(_parentNode);
 
@@ -282,6 +296,9 @@ contract ModularENSRegistry is ModularENS {
             // Append to merkle tree
             (_merkleRoot, _nonce) = _updateMerkle(_nameHash, _recordHash, _tldNode, _parentNode, _record.nonce);
 
+            // Send hook
+            _sendHook(_nameHash, _record);
+
             // Emit events
             emit RecordChanged(_tldNode, _nameHash, _owner, _merkleRoot, _record);
             emit NewOwner(_parentNode, _labelHash, _owner);
@@ -298,7 +315,7 @@ contract ModularENSRegistry is ModularENS {
         update(_node, _owner, _record.expiration, _record.ttl);
     }
 
-    function setExpiration(bytes32 _node, uint64 _expiration) public {
+    function setExpiration(bytes32 _node, uint256 _expiration) public {
         Record memory _record = records[_node];
         update(_node, _record.owner, _expiration, _record.ttl);
     }
