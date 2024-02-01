@@ -15,7 +15,6 @@ contract ModularENSRegistry is ModularENS {
     mapping(address => mapping(address => bool)) operators;
     mapping(bytes32 => TLD) _tld;
     mapping(bytes32 => bytes32) public nodeMerkleRoot;
-    mapping(bytes32 => bool) public isRootFraud;
 
     uint256[500] private __gap;
 
@@ -62,7 +61,7 @@ contract ModularENSRegistry is ModularENS {
 
     function _validNode(bytes32 node) internal view returns (bool) {
         uint256 _expiration = expiration(node);
-        return (block.timestamp <= _expiration || _expiration != 0) && !isRootFraud[nodeMerkleRoot[node]];
+        return (block.timestamp <= _expiration || _expiration != 0) && !merkleForest.isFraud(nodeMerkleRoot[node]);
     }
 
     function expiration(bytes32 node) public view returns (uint256) {

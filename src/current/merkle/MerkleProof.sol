@@ -69,8 +69,8 @@ library MerkleProof {
             // define pointer
             let input := mload(0x40) // 0x40 is always the free memory pointer. Don't change this.
             mstore(input, leftInput) // push first input
-            mstore(add(input, 0x1b), rightInput) // push second input at position 27bytes = 0x1b
-            success := staticcall(not(0), 2, input, 0x36, output, 0x20)
+            mstore(add(input, 0x20), rightInput) // push second input at position 32bytes = 0x20
+            success := staticcall(not(0), 2, input, 0x40, output, 0x20)
             // Use "invalid" to make gas estimation work
             switch success
             case 0 { invalid() }

@@ -48,7 +48,7 @@ contract MerkleForestSHA {
 
     // event Output(bytes32 leftInput, bytes32 rightInput, bytes32 output, uint nodeIndex); // for debugging only
 
-    mapping(bytes32 => bytes32[32]) frontierForest; // the right-most 'frontier' of nodes required to calculate the new root when the next new leaf value is added.
+    mapping(bytes32 => bytes32[40]) frontierForest; // the right-most 'frontier' of nodes required to calculate the new root when the next new leaf value is added.
     mapping(bytes32 => uint256) public leafCountForest; // the number of leaves currently in the tree
 
     // Support 1 trillion domains
@@ -97,7 +97,7 @@ contract MerkleForestSHA {
     function _insertLeaf(bytes32 leafValue, bytes32 treeId) internal returns (bytes32 root) {
         unchecked {
             uint256 leafCount = leafCountForest[treeId];
-            bytes32[32] storage frontier = frontierForest[treeId];
+            bytes32[40] storage frontier = frontierForest[treeId];
 
             // check that space exists in the tree:
             require(treeWidth > leafCount, "There is no space left in the tree.");
@@ -189,7 +189,7 @@ contract MerkleForestSHA {
     function _insertLeaves(bytes32[] memory leafValues, bytes32 treeId) internal returns (bytes32 root) {
         unchecked {
             uint256 leafCount = leafCountForest[treeId];
-            bytes32[32] storage frontier = frontierForest[treeId];
+            bytes32[40] storage frontier = frontierForest[treeId];
 
             uint256 numberOfLeaves = leafValues.length;
 
@@ -217,7 +217,7 @@ contract MerkleForestSHA {
             bytes32[1] memory output; // the output of the hash
             bool success;
 
-            bytes32[32] memory tempFrontier = frontier;
+            bytes32[40] memory tempFrontier = frontier;
 
             // consider each new leaf in turn, from left to right:
             for (uint256 leafIndex = leafCount; leafIndex < leafCount + numberOfLeaves; leafIndex++) {
