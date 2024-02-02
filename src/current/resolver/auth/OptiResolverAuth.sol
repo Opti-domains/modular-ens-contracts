@@ -3,11 +3,8 @@ pragma solidity ^0.8.8;
 
 error Unauthorised();
 
-contract OptiResolverAuth {
-    function _isAuthorised(bytes32 node) internal view returns (bool) {
-        // TODO
-        return true;
-    }
+abstract contract OptiResolverAuth {
+    function _isAuthorised(bytes32 node) internal view virtual returns (bool);
 
     modifier authorised(bytes32 node) {
         if (!_isAuthorised(node)) revert Unauthorised();

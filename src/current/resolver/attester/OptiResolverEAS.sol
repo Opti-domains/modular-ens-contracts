@@ -7,7 +7,7 @@ import "./OptiResolverAttesterBase.sol";
 bytes32 constant RESOLVER_STORAGE_NAMESPACE = keccak256("optidomains.resolver.storage");
 
 // TODO
-address constant EAS = 0x0000000000000000000000000000000000000000;
+address constant EAS = 0x4200000000000000000000000000000000000021;
 
 contract OptiResolverEAS is OptiResolverAttesterBase {
     function _read(bytes32 schema, address recipient, bytes memory header)

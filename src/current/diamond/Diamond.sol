@@ -37,7 +37,7 @@ abstract contract Diamond is
 
     function initialize(address _owner, address _fallback) public virtual {
         Initialization storage initialization;
-        bytes32 slot = keccak256("optidomains.contracts.initialization");
+        bytes32 slot = keccak256("optidomains.contracts.Diamond.initialization");
         assembly {
             initialization.slot := slot
         }
