@@ -2,9 +2,8 @@
 pragma solidity ^0.8.4;
 
 import "./interfaces/IMulticallable.sol";
-import "@solidstate/contracts/interfaces/IERC165.sol";
 
-abstract contract Multicallable is IMulticallable, IERC165 {
+abstract contract Multicallable is IMulticallable {
     function _multicall(bytes32 nodehash, bytes[] calldata data) internal returns (bytes[] memory results) {
         results = new bytes[](data.length);
         for (uint256 i = 0; i < data.length; i++) {
@@ -31,9 +30,5 @@ abstract contract Multicallable is IMulticallable, IERC165 {
 
     function multicall(bytes[] calldata data) public override returns (bytes[] memory results) {
         return _multicall(bytes32(0), data);
-    }
-
-    function supportsInterface(bytes4 interfaceID) public view virtual override(IERC165) returns (bool) {
-        return interfaceID == type(IMulticallable).interfaceId;
     }
 }

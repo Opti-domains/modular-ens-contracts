@@ -2,14 +2,13 @@
 pragma solidity ^0.8.8;
 
 import {SafeOwnableInternal} from "@solidstate/contracts/access/ownable/SafeOwnableInternal.sol";
-import "../../registry/ModularENS.sol";
+import "../../diamond/UseRegistry.sol";
+import "./IOptiResolverAuthBasic.sol";
 import "./OptiResolverAuth.sol";
 
 library OptiResolverAuthBasicStorage {
     struct Layout {
-        ModularENS registry;
         mapping(address => mapping(address => bool)) operators;
-        bool initialized;
     }
 
     bytes32 internal constant STORAGE_SLOT = keccak256("optidomains.contracts.storage.OptiResolverAuthBasic");
@@ -22,20 +21,19 @@ library OptiResolverAuthBasicStorage {
     }
 }
 
-contract OptiResolverAuthBasic is OptiResolverAuth, SafeOwnableInternal {
-    function initialize(ModularENS registry) external {
-        OptiResolverAuthBasicStorage.Layout storage S = OptiResolverAuthBasicStorage.layout();
-        require(!S.initialized, "Initialized");
-
-        S.registry = registry;
+contract OptiResolverAuthBasicInternal is OptiResolverAuth, UseRegistry, SafeOwnableInternal {
+    function initialize() public virtual {
+        _setSupportsInterface(type(IOptiResolverAuthBasic).interfaceId, true);
     }
 
     function _isAuthorised(bytes32 node) internal view virtual override returns (bool) {
         OptiResolverAuthBasicStorage.Layout storage S = OptiResolverAuthBasicStorage.layout();
-        address domainOwner = S.registry.owner(node);
+        address domainOwner = registry().owner(node);
         return domainOwner == msg.sender || _owner() == msg.sender || S.operators[domainOwner][msg.sender];
     }
+}
 
+contract OptiResolverAuthBasic is IOptiResolverAuthBasic, OptiResolverAuthBasicInternal {
     event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
 
     function setApprovalForAll(address _operator, bool _approved) public virtual {
