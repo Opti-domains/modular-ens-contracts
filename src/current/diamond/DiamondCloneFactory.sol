@@ -20,4 +20,13 @@ contract DiamondCloneFactory is IDiamondCloneFactory {
         IDiamondResolverInitialize(newResolver).initialize(msg.sender, address(this));
         emit CloneDiamond(msg.sender, newResolver);
     }
+
+    /**
+     * Get the predicted address of a clone based on the sender and a salt
+     * without deploying it.
+     */
+    function getCloneAddress(bytes32 salt) public view returns (address predictedAddress) {
+        bytes32 saltHash = keccak256(abi.encodePacked(msg.sender, salt));
+        predictedAddress = Clones.predictDeterministicAddress(address(this), saltHash, address(this));
+    }
 }

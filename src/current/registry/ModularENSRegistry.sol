@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.8;
 
+import {IDiamondWritableInternal} from "@solidstate/contracts/proxy/diamond/writable/IDiamondWritableInternal.sol";
+import {IDiamondWritable} from "@solidstate/contracts/proxy/diamond/writable/IDiamondWritable.sol";
+import "@ensdomains/ens-contracts/utils/NameEncoder.sol";
 import "./ModularENS.sol";
 import "../merkle/MerkleForest.sol";
 import "../diamond/interfaces/IDiamondCloneFactory.sol";
-import "../registrar/IRegistrarHook.sol";
-import "@ensdomains/ens-contracts/utils/NameEncoder.sol";
+import "../registrar/interfaces/IRegistrarHook.sol";
 
 contract ModularENSRegistry is ModularENS {
     address public immutable root;
     MerkleForest public immutable merkleForest;
-    IDiamondCloneFactory public immutable baseResolver;
 
     mapping(bytes32 => Record) records;
     mapping(address => mapping(address => bool)) operators;
@@ -54,10 +55,9 @@ contract ModularENSRegistry is ModularENS {
 
     // ============= Immutable constructor =============
 
-    constructor(address _root, MerkleForest _merkleForest, IDiamondCloneFactory _baseResolver) {
+    constructor(address _root, MerkleForest _merkleForest) {
         root = _root;
         merkleForest = _merkleForest;
-        baseResolver = _baseResolver;
     }
 
     // ============= Getter functions =============
@@ -142,8 +142,7 @@ contract ModularENSRegistry is ModularENS {
      * @return ttl of the node.
      */
     function ttl(bytes32 node) public view virtual override returns (uint64) {
-        if (!_validNode(node)) return 0;
-        return records[node].ttl;
+        return 0;
     }
 
     /**
@@ -153,6 +152,28 @@ contract ModularENSRegistry is ModularENS {
      */
     function recordExists(bytes32 node) public view virtual override returns (bool) {
         return records[node].owner != address(0x0);
+    }
+
+    // ============= Resolver functions =============
+
+    function resolverDiamondCut(
+        bytes32 _node,
+        IDiamondWritableInternal.FacetCut[] calldata _facetCuts,
+        address _target,
+        bytes calldata _data
+    ) public onlyRegistrar(_node) {
+        address _resolver = IDiamondCloneFactory(_tld[records[_node].tldNode].resolver).getCloneAddress(_node);
+        IDiamondWritable(_resolver).diamondCut(_facetCuts, _target, _data);
+    }
+
+    function resolverCall(bytes32 _node, bytes calldata _calldata) public payable onlyRegistrar(_node) {
+        address _resolver = IDiamondCloneFactory(_tld[records[_node].tldNode].resolver).getCloneAddress(_node);
+        (bool success, bytes memory result) = _resolver.call{value: msg.value}(_calldata);
+        if (!success) {
+            assembly {
+                revert(add(result, 32), mload(result))
+            }
+        }
     }
 
     // ============= Write functions =============
@@ -203,8 +224,9 @@ contract ModularENSRegistry is ModularENS {
         Record memory _record = Record({
             owner: _tldObj.registrar,
             resolver: _tldObj.resolver,
-            ttl: 0,
             expiration: 0,
+            registrationTime: 0,
+            updatedTimestamp: 0,
             parentNode: bytes32(0),
             tldNode: _tldNode,
             nonce: 0,
@@ -218,7 +240,7 @@ contract ModularENSRegistry is ModularENS {
         emit NewTLD(_tldNode, _nameHash, _tldObj.registrar, _tldObj);
     }
 
-    function update(bytes32 _nameHash, address _owner, uint256 _expiration, uint64 _ttl)
+    function update(bytes32 _nameHash, address _owner, uint256 _expiration)
         public
         onlyRegistrar(_nameHash)
         returns (bytes32 _merkleRoot, uint256 _nonce)
@@ -234,15 +256,11 @@ contract ModularENSRegistry is ModularENS {
             emit Transfer(_nameHash, _owner);
         }
 
-        if (_record.ttl != _ttl) {
-            emit NewTTL(_nameHash, _ttl);
-        }
-
         // Update record values
         _record.owner = _owner;
         _record.expiration = _expiration;
-        _record.ttl = _ttl;
         _record.nonce = merkleForest.latestNonce(_record.tldNode);
+        _record.updatedTimestamp = block.timestamp;
 
         // Calculate recordHash with sha256 for most compatiblility across chains
         bytes32 _recordHash = sha256(abi.encode(_record));
@@ -262,7 +280,6 @@ contract ModularENSRegistry is ModularENS {
         bytes32 _parentNode,
         address _owner,
         uint256 _expiration,
-        uint64 _ttl,
         string memory _label,
         bytes memory _data
     ) public onlyRegistrar(_parentNode) returns (bytes32 _nameHash, bytes32 _merkleRoot, uint256 _nonce) {
@@ -274,13 +291,14 @@ contract ModularENSRegistry is ModularENS {
         } else {
             bytes32 _tldNode = tldNode(_parentNode);
 
-            address _resolver = baseResolver.clone(_nameHash);
+            address _resolver = IDiamondCloneFactory(_tld[_tldNode].resolver).clone(_nameHash);
 
             Record memory _record = Record({
                 owner: _owner,
                 resolver: _resolver,
-                ttl: _ttl,
                 expiration: _expiration,
+                registrationTime: block.timestamp,
+                updatedTimestamp: block.timestamp,
                 parentNode: _parentNode,
                 tldNode: _tldNode,
                 nonce: merkleForest.latestNonce(_tldNode),
@@ -304,7 +322,6 @@ contract ModularENSRegistry is ModularENS {
             emit NewOwner(_parentNode, _labelHash, _owner);
             emit Transfer(_nameHash, _owner);
             emit NewResolver(_nameHash, _resolver);
-            emit NewTTL(_nameHash, _ttl);
         }
     }
 
@@ -312,17 +329,12 @@ contract ModularENSRegistry is ModularENS {
 
     function setOwner(bytes32 _node, address _owner) public {
         Record memory _record = records[_node];
-        update(_node, _owner, _record.expiration, _record.ttl);
+        update(_node, _owner, _record.expiration);
     }
 
     function setExpiration(bytes32 _node, uint256 _expiration) public {
         Record memory _record = records[_node];
-        update(_node, _record.owner, _expiration, _record.ttl);
-    }
-
-    function setTTL(bytes32 _node, uint64 _ttl) public {
-        Record memory _record = records[_node];
-        update(_node, _record.owner, _record.expiration, _ttl);
+        update(_node, _record.owner, _expiration);
     }
 
     function setData(bytes32 _node, bytes memory _data) public {

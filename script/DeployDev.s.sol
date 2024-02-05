@@ -144,7 +144,7 @@ contract DeployDevScript is Script {
         MerkleForest merkleForest = new MerkleForest();
         merkleForest.initialize();
 
-        ModularENSRegistry registry = new ModularENSRegistry(msg.sender, merkleForest, diamond);
+        ModularENSRegistry registry = new ModularENSRegistry(msg.sender, merkleForest);
 
         // Add facets to the diamond
         registerResolverUseRegistryFacet(diamond, registry);

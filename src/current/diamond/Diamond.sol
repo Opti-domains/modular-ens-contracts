@@ -45,7 +45,7 @@ abstract contract Diamond is
         require(!initialization.initialized, "Initialized");
 
         if (_fallback == address(0)) {
-            bytes4[] memory selectors = new bytes4[](14);
+            bytes4[] memory selectors = new bytes4[](15);
             uint256 selectorIndex;
 
             // register DiamondFallback
@@ -79,6 +79,7 @@ abstract contract Diamond is
             // register DiamondCloneFactory
 
             selectors[selectorIndex++] = IDiamondCloneFactory.clone.selector;
+            selectors[selectorIndex++] = IDiamondCloneFactory.getCloneAddress.selector;
 
             // diamond cut
 

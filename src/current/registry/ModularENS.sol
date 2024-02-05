@@ -15,8 +15,9 @@ interface ModularENS is ENSReadOnly {
     struct Record {
         address owner;
         address resolver;
-        uint64 ttl;
         uint256 expiration;
+        uint256 registrationTime;
+        uint256 updatedTimestamp;
         bytes32 parentNode;
         bytes32 tldNode;
         uint256 nonce;
@@ -32,12 +33,11 @@ interface ModularENS is ENSReadOnly {
         bytes32 parentNode,
         address owner,
         uint256 expiration,
-        uint64 ttl,
         string memory label,
         bytes memory data
     ) external returns (bytes32, bytes32, uint256);
 
-    function update(bytes32 _node, address _owner, uint256 _expiration, uint64 _ttl)
+    function update(bytes32 _node, address _owner, uint256 _expiration)
         external
         returns (bytes32, uint256);
 
@@ -45,7 +45,6 @@ interface ModularENS is ENSReadOnly {
 
     function setOwner(bytes32 node, address owner) external;
     function setExpiration(bytes32 node, uint256 expiration) external;
-    function setTTL(bytes32 node, uint64 ttl) external;
     function setData(bytes32 node, bytes memory data) external;
 
     function setApprovalForAll(address operator, bool approved) external;

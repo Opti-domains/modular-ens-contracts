@@ -3,7 +3,7 @@ pragma solidity ^0.8.8;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "../registry/ModularENS.sol";
-import "./IRegistrarHook.sol";
+import "./interfaces/IRegistrarHook.sol";
 
 bytes32 constant OP_NAMEHASH = bytes32(0);
 
@@ -46,12 +46,10 @@ contract OpDomains is ERC721("Opti.Domains", ".op"), IRegistrarHook {
         bytes32[] calldata resolverCalldata,
         bytes calldata signature
     ) external payable {
-        registry.register(OP_NAMEHASH, owner, expiration, 0, label, "");
+        registry.register(OP_NAMEHASH, owner, expiration, label, "");
     }
 
     function extendExpiry(bytes32 node, uint256 expiration, bytes calldata signature) external payable {
         registry.setExpiration(node, expiration);
     }
-
-    
 }
