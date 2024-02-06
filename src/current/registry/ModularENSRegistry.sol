@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.8;
 
-import {IDiamondWritableInternal} from "@solidstate/contracts/proxy/diamond/writable/IDiamondWritableInternal.sol";
 import {IDiamondWritable} from "@solidstate/contracts/proxy/diamond/writable/IDiamondWritable.sol";
 import "@ensdomains/ens-contracts/utils/NameEncoder.sol";
 import "./ModularENS.sol";
@@ -64,7 +63,7 @@ contract ModularENSRegistry is ModularENS {
 
     function _validNode(bytes32 node) internal view returns (bool) {
         uint256 _expiration = expiration(node);
-        return (block.timestamp <= _expiration || _expiration != 0) && !merkleForest.isFraud(nodeMerkleRoot[node]);
+        return (block.timestamp <= _expiration || _expiration == 0) && !merkleForest.isFraud(nodeMerkleRoot[node]);
     }
 
     function expiration(bytes32 node) public view returns (uint256) {
@@ -94,8 +93,8 @@ contract ModularENSRegistry is ModularENS {
         return records[node].tldNode;
     }
 
-    function tld(bytes32 tldHash) public view returns (TLD memory) {
-        return _tld[tldHash];
+    function tld(bytes32 tldNodeHash) public view returns (TLD memory) {
+        return _tld[tldNodeHash];
     }
 
     function data(bytes32 node) public view returns (bytes memory) {
@@ -152,28 +151,6 @@ contract ModularENSRegistry is ModularENS {
      */
     function recordExists(bytes32 node) public view virtual override returns (bool) {
         return records[node].owner != address(0x0);
-    }
-
-    // ============= Resolver functions =============
-
-    function resolverDiamondCut(
-        bytes32 _node,
-        IDiamondWritableInternal.FacetCut[] calldata _facetCuts,
-        address _target,
-        bytes calldata _data
-    ) public onlyRegistrar(_node) {
-        address _resolver = IDiamondCloneFactory(_tld[records[_node].tldNode].resolver).getCloneAddress(_node);
-        IDiamondWritable(_resolver).diamondCut(_facetCuts, _target, _data);
-    }
-
-    function resolverCall(bytes32 _node, bytes calldata _calldata) public payable onlyRegistrar(_node) {
-        address _resolver = IDiamondCloneFactory(_tld[records[_node].tldNode].resolver).getCloneAddress(_node);
-        (bool success, bytes memory result) = _resolver.call{value: msg.value}(_calldata);
-        if (!success) {
-            assembly {
-                revert(add(result, 32), mload(result))
-            }
-        }
     }
 
     // ============= Write functions =============
@@ -325,6 +302,34 @@ contract ModularENSRegistry is ModularENS {
         }
     }
 
+    // ============= Resolver functions =============
+
+    function resolverDiamondCut(
+        bytes32 _node,
+        IDiamondWritableInternal.FacetCut[] calldata _facetCuts,
+        address _target,
+        bytes calldata _data
+    ) public onlyRegistrar(_node) {
+        address _resolver = IDiamondCloneFactory(_tld[records[_node].tldNode].resolver).getCloneAddress(_node);
+        IDiamondWritable(_resolver).diamondCut(_facetCuts, _target, _data);
+    }
+
+    function resolverCall(bytes32 _node, bytes calldata _calldata)
+        public
+        payable
+        onlyRegistrar(_node)
+        returns (bytes memory)
+    {
+        address _resolver = IDiamondCloneFactory(_tld[records[_node].tldNode].resolver).getCloneAddress(_node);
+        (bool success, bytes memory result) = _resolver.call{value: msg.value}(_calldata);
+        if (!success) {
+            assembly {
+                revert(add(result, 32), mload(result))
+            }
+        }
+        return result;
+    }
+
     // ============= Single update functions =============
 
     function setOwner(bytes32 _node, address _owner) public {
@@ -361,8 +366,9 @@ contract ModularENSRegistry is ModularENS {
     // ============= Registrar operator approval functions =============
 
     /**
-     * @dev [Registrar Only] Enable or disable approval for a third party ("operator") to manage
-     *  all of ENS records under a TLD. Emits the ApprovalForAll event.
+     * @dev Enable or disable approval for a third party ("operator") to manage
+     *  all of ENS records under a registrar or up to the registrar logic.
+     *  Emits the ApprovalForAll event.
      * @param _operator Address to add to the set of authorized operators.
      * @param _approved True if the operator is approved, false to revoke approval.
      */

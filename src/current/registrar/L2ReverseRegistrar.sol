@@ -1,26 +1,73 @@
 pragma solidity >=0.8.4;
 
-// import "../registry/ENS.sol";
+import "../registry/ModularENS.sol";
 import "./interfaces/IL2ReverseRegistrar.sol";
+import "./interfaces/IL2ReverseRegistrarPrivileged.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "../resolver/public-resolver/text-resolver/ITextResolver.sol";
 import "../resolver/public-resolver/name-resolver/INameResolver.sol";
+import "../diamond/interfaces/IDiamondCloneFactory.sol";
 import "../diamond/Multicallable.sol";
 
 error InvalidSignature();
 error SignatureOutOfDate();
 error Unauthorised();
 error NotOwnerOfContract();
+error SetTextNotSupported();
+
+library StringsForReverseRegistrar {
+    bytes16 private constant HEX_DIGITS = "0123456789abcdef";
+    uint8 private constant ADDRESS_LENGTH = 20;
+
+    /**
+     * @dev The `value` string doesn't fit in the specified `length`.
+     */
+    error StringsInsufficientHexLength(uint256 value, uint256 length);
+
+    /**
+     * @dev Converts a `uint256` to its ASCII `string` hexadecimal representation with fixed length.
+     */
+    function toHexString(uint256 value, uint256 length) internal pure returns (string memory) {
+        uint256 localValue = value;
+        bytes memory buffer = new bytes(2 * length);
+        for (uint256 i = 2 * length - 1; i >= 0; --i) {
+            buffer[i] = HEX_DIGITS[localValue & 0xf];
+            localValue >>= 4;
+        }
+        if (localValue != 0) {
+            revert StringsInsufficientHexLength(value, length);
+        }
+        return string(buffer);
+    }
+
+    /**
+     * @dev Converts an `address` with fixed length of 20 bytes to its not checksummed ASCII `string` hexadecimal
+     * representation.
+     */
+    function toHexString(address addr) internal pure returns (string memory) {
+        return toHexString(uint256(uint160(addr)), ADDRESS_LENGTH);
+    }
+}
 
 // @note Inception date
 // The inception date is in milliseconds, and so will be divided by 1000
 // when comparing to block.timestamp. This means that the date will be
 // rounded down to the nearest second.
 
-contract L2ReverseRegistrar is Multicallable, Ownable, ITextResolver, INameResolver, IL2ReverseRegistrar {
+contract L2ReverseRegistrar is
+    Multicallable,
+    Ownable,
+    ITextResolver,
+    INameResolver,
+    IL2ReverseRegistrar,
+    IL2ReverseRegistrarPrivileged,
+    IDiamondCloneFactory
+{
     using ECDSA for bytes32;
+
+    ModularENS public immutable registry;
 
     mapping(bytes32 => uint256) public lastUpdated;
     mapping(uint64 => mapping(bytes32 => mapping(string => string))) versionable_texts;
@@ -30,7 +77,11 @@ contract L2ReverseRegistrar is Multicallable, Ownable, ITextResolver, INameResol
     event VersionChanged(bytes32 indexed node, uint64 newVersion);
     event ReverseClaimed(address indexed addr, bytes32 indexed node);
 
-    bytes32 public immutable L2ReverseNode;
+    // addr.reverse namehash
+    bytes32 constant L2ReverseNode = 0x91d1777781884d03a6757a803996e38de2a42967fb37eeaca72729271025a9e2;
+
+    // reverse namehash
+    bytes32 constant RootReverseNode = 0xa097f6721ce401e757d1223a763fef49b8b5f90bb18567ddb86fd205dff71d34;
 
     // This is the hex encoding of the string 'abcdefghijklmnopqrstuvwxyz'
     // It is used as a constant to lookup the characters of the hex address
@@ -39,8 +90,9 @@ contract L2ReverseRegistrar is Multicallable, Ownable, ITextResolver, INameResol
     /**
      * @dev Constructor
      */
-    constructor(bytes32 _L2ReverseNode) {
-        L2ReverseNode = _L2ReverseNode;
+    constructor(ModularENS _registry) {
+        registry = _registry;
+        registry.register(RootReverseNode, address(this), 0, "addr", "");
     }
 
     modifier authorised(address addr) {
@@ -143,7 +195,7 @@ contract L2ReverseRegistrar is Multicallable, Ownable, ITextResolver, INameResol
     {
         bytes32 node = _getNamehash(addr);
 
-        _setName(node, name, inceptionDate);
+        _setName(addr, node, name, inceptionDate);
         return node;
     }
 
@@ -174,7 +226,7 @@ contract L2ReverseRegistrar is Multicallable, Ownable, ITextResolver, INameResol
         returns (bytes32)
     {
         bytes32 node = _getNamehash(contractAddr);
-        _setName(node, name, inceptionDate);
+        _setName(contractAddr, node, name, inceptionDate);
     }
 
     /**
@@ -194,10 +246,25 @@ contract L2ReverseRegistrar is Multicallable, Ownable, ITextResolver, INameResol
      * @param name The name to set for this address.
      * @return The ENS node hash of the reverse record.
      */
-
     function setNameForAddr(address addr, string memory name) public authorised(addr) returns (bytes32) {
         bytes32 node = _getNamehash(addr);
-        _setName(node, name, block.timestamp);
+        _setName(addr, node, name, block.timestamp);
+        return node;
+    }
+
+    /**
+     * @dev Sets the `name()` record for the reverse ENS record associated with
+     * the addr provided account with registrar's privileged permission.
+     * @param name The name to set for this address.
+     * @return The ENS node hash of the reverse record.
+     */
+    function setNameFromRegistrar(bytes32 tldNode, address addr, string memory name) public returns (bytes32) {
+        if (registry.tld(tldNode).registrar != msg.sender) {
+            revert Unauthorised();
+        }
+
+        bytes32 node = _getNamehash(addr);
+        _setName(addr, node, name, block.timestamp);
         return node;
     }
 
@@ -277,12 +344,31 @@ contract L2ReverseRegistrar is Multicallable, Ownable, ITextResolver, INameResol
 
     /**
      * @dev Sets the `text(key)` record for the reverse ENS record associated with
+     * the addr provided account with registrar's privileged permission.
+     * @param key The key for this text record.
+     * @param value The value to set for this text record.
+     * @return The ENS node hash of the reverse record.
+     */
+    function setTextFromRegistrar(bytes32 tldNode, address addr, string calldata key, string calldata value)
+        public
+        returns (bytes32)
+    {
+        if (registry.tld(tldNode).registrar != msg.sender) {
+            revert Unauthorised();
+        }
+
+        bytes32 node = _getNamehash(addr);
+        _setText(node, key, value, block.timestamp);
+        return node;
+    }
+
+    /**
+     * @dev Sets the `text(key)` record for the reverse ENS record associated with
      * the addr provided account.
      * @param key The key for this text record.
      * @param value The value to set for this text record.
      * @return The ENS node hash of the reverse record.
      */
-
     function setTextForAddr(address addr, string calldata key, string calldata value)
         public
         override
@@ -295,6 +381,9 @@ contract L2ReverseRegistrar is Multicallable, Ownable, ITextResolver, INameResol
     }
 
     function _setText(bytes32 node, string calldata key, string calldata value, uint256 inceptionDate) internal {
+        // Not supported in this version to prevent further bugs
+        revert SetTextNotSupported();
+
         versionable_texts[recordVersions[node]][node][key] = value;
         _setLastUpdated(node, inceptionDate);
         emit TextChanged(node, key, key, value);
@@ -316,9 +405,12 @@ contract L2ReverseRegistrar is Multicallable, Ownable, ITextResolver, INameResol
      * @param node The node to update.
      * @param newName name record
      */
-    function _setName(bytes32 node, string memory newName, uint256 inceptionDate) internal virtual {
+    function _setName(address addr, bytes32 node, string memory newName, uint256 inceptionDate) internal virtual {
         versionable_names[recordVersions[node]][node] = newName;
         _setLastUpdated(node, inceptionDate);
+
+        registry.register(L2ReverseNode, addr, 0, StringsForReverseRegistrar.toHexString(addr), abi.encode(newName));
+
         emit NameChanged(node, newName);
     }
 
@@ -389,9 +481,6 @@ contract L2ReverseRegistrar is Multicallable, Ownable, ITextResolver, INameResol
     }
 
     function _setLastUpdated(bytes32 node, uint256 inceptionDate) internal {
-        if (inceptionDate < lastUpdated[node]) {
-            
-        }
         lastUpdated[node] = inceptionDate;
     }
 
@@ -419,6 +508,15 @@ contract L2ReverseRegistrar is Multicallable, Ownable, ITextResolver, INameResol
 
     function supportsInterface(bytes4 interfaceID) public pure returns (bool) {
         return interfaceID == type(IL2ReverseRegistrar).interfaceId || interfaceID == type(ITextResolver).interfaceId
-            || interfaceID == type(INameResolver).interfaceId || interfaceID == type(IMulticallable).interfaceId;
+            || interfaceID == type(INameResolver).interfaceId || interfaceID == type(IMulticallable).interfaceId
+            || interfaceID == type(IL2ReverseRegistrarPrivileged).interfaceId;
+    }
+
+    function clone(bytes32) external override returns (address) {
+        return address(this);
+    }
+
+    function getCloneAddress(bytes32) external view override returns (address predictedAddress) {
+        return address(this);
     }
 }
