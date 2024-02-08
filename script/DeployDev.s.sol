@@ -26,8 +26,18 @@ import {
     ITextResolver,
     IExtendedResolver
 } from "src/current/resolver/public-resolver/PublicResolverFacet.sol";
+import {UniversalResolver} from "src/current/universal-resolver/UniversalResolver.sol";
+import {L2ReverseRegistrar} from "src/current/registrar/L2ReverseRegistrar.sol";
+
+interface ResolverWriteActions {
+    function setAddr(bytes32 node, address a) external;
+    function setText(bytes32 node, string calldata key, string calldata value) external;
+}
 
 contract DeployDevScript is Script {
+    bytes32 constant RootReverseNode = 0xa097f6721ce401e757d1223a763fef49b8b5f90bb18567ddb86fd205dff71d34;
+    bytes32 constant TestOpNode = 0xfae0b61043b4c3f6c273df2f4250b206df74ff1581506844d930bf1f7356d5bf;
+
     /// @notice Modifier that wraps a function in broadcasting.
     modifier broadcast() {
         vm.startBroadcast(msg.sender);
@@ -142,21 +152,48 @@ contract DeployDevScript is Script {
         Diamond diamond = new DiamondResolver(msg.sender);
 
         MerkleForest merkleForest = new MerkleForest();
-        merkleForest.initialize();
-
         ModularENSRegistry registry = new ModularENSRegistry(msg.sender, merkleForest);
+
+        merkleForest.initialize(address(registry));
 
         // Add facets to the diamond
         registerResolverUseRegistryFacet(diamond, registry);
         registerResolverAuthFacet(diamond);
         registerResolverFacet(diamond);
 
+        // Register L2ReverseRegistrar
+        L2ReverseRegistrar reverseRegistrar = new L2ReverseRegistrar(registry);
+        registry.registerTLD(
+            ModularENS.TLD({
+                chainId: block.chainid,
+                nameHash: RootReverseNode,
+                registrar: address(reverseRegistrar),
+                resolver: address(reverseRegistrar),
+                name: "reverse"
+            })
+        );
+        reverseRegistrar.registerAddrNode();
+
+        // Register .op TLD
         OpDomains opDomains = new OpDomains(registry);
         registerTld("op", diamond, registry, address(opDomains));
+
+        // Deploy UniversalResolver
+        UniversalResolver universalResolver = new UniversalResolver(address(registry), new string[](0));
+
+        // Test register .op domain
+        bytes[] memory resolverCalldata = new bytes[](0);
+        // resolverCalldata[0] = abi.encodeWithSelector(ResolverWriteActions.setAddr.selector, TestOpNode, msg.sender);
+        // resolverCalldata[1] =
+        //     abi.encodeWithSelector(ResolverWriteActions.setText.selector, TestOpNode, "com.twitter", "optidomains");
+        opDomains.register("test", msg.sender, 1893456000, 0, true, resolverCalldata, "");
+        opDomains.extendExpiry(TestOpNode, 1993456000, "");
 
         // Print addresses
         console2.log("Registry address", address(registry));
         console2.log("Merkle Forest address", address(merkleForest));
         console2.log("OP Registrar address", address(opDomains));
+        console2.log("L2 Reverse Registrar address", address(reverseRegistrar));
+        console2.log("Universal Resolver address", address(universalResolver));
     }
 }

@@ -36,7 +36,7 @@ abstract contract AddrResolver is IAddrResolver, IAddressResolver, OptiResolverA
         return bytesToAddress(a);
     }
 
-    function setAddr(bytes32 node, uint256 coinType, bytes memory a) public virtual {
+    function setAddr(bytes32 node, uint256 coinType, bytes memory a) public virtual authorised(node) {
         emit AddressChanged(node, coinType, a);
         if (coinType == COIN_TYPE_ETH) {
             emit AddrChanged(node, bytesToAddress(a));

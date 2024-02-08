@@ -3,6 +3,7 @@ pragma solidity >=0.8.4;
 import "../registry/ModularENS.sol";
 import "./interfaces/IL2ReverseRegistrar.sol";
 import "./interfaces/IL2ReverseRegistrarPrivileged.sol";
+import "./interfaces/IRegistrarHook.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
@@ -32,10 +33,12 @@ library StringsForReverseRegistrar {
     function toHexString(uint256 value, uint256 length) internal pure returns (string memory) {
         uint256 localValue = value;
         bytes memory buffer = new bytes(2 * length);
-        for (uint256 i = 2 * length - 1; i >= 0; --i) {
+        for (uint256 i = 2 * length - 1; i > 0; --i) {
             buffer[i] = HEX_DIGITS[localValue & 0xf];
             localValue >>= 4;
         }
+        buffer[0] = HEX_DIGITS[localValue & 0xf];
+        localValue >>= 4;
         if (localValue != 0) {
             revert StringsInsufficientHexLength(value, length);
         }
@@ -63,7 +66,8 @@ contract L2ReverseRegistrar is
     INameResolver,
     IL2ReverseRegistrar,
     IL2ReverseRegistrarPrivileged,
-    IDiamondCloneFactory
+    IDiamondCloneFactory,
+    IRegistrarHook
 {
     using ECDSA for bytes32;
 
@@ -73,6 +77,7 @@ contract L2ReverseRegistrar is
     mapping(uint64 => mapping(bytes32 => mapping(string => string))) versionable_texts;
     mapping(uint64 => mapping(bytes32 => string)) versionable_names;
     mapping(bytes32 => uint64) internal recordVersions;
+    bool internal _onUpdateRecord = false;
 
     event VersionChanged(bytes32 indexed node, uint64 newVersion);
     event ReverseClaimed(address indexed addr, bytes32 indexed node);
@@ -92,6 +97,9 @@ contract L2ReverseRegistrar is
      */
     constructor(ModularENS _registry) {
         registry = _registry;
+    }
+
+    function registerAddrNode() external onlyOwner {
         registry.register(RootReverseNode, address(this), 0, "addr", "");
     }
 
@@ -409,7 +417,15 @@ contract L2ReverseRegistrar is
         versionable_names[recordVersions[node]][node] = newName;
         _setLastUpdated(node, inceptionDate);
 
-        registry.register(L2ReverseNode, addr, 0, StringsForReverseRegistrar.toHexString(addr), abi.encode(newName));
+        if (!_onUpdateRecord) {
+            if (!registry.recordExists(node)) {
+                registry.register(
+                    L2ReverseNode, addr, 0, StringsForReverseRegistrar.toHexString(addr), abi.encode(newName)
+                );
+            } else {
+                registry.setData(node, abi.encode(newName));
+            }
+        }
 
         emit NameChanged(node, newName);
     }
@@ -518,5 +534,17 @@ contract L2ReverseRegistrar is
 
     function getCloneAddress(bytes32) external view override returns (address predictedAddress) {
         return address(this);
+    }
+
+    function updateRecord(ModularENS.Record calldata record) external override {
+        if (msg.sender != address(registry)) {
+            revert Unauthorised();
+        }
+
+        if (record.data.length > 0) {
+            _onUpdateRecord = true;
+            _setName(record.owner, record.nameHash, abi.decode(record.data, (string)), record.updatedTimestamp);
+            _onUpdateRecord = false;
+        }
     }
 }

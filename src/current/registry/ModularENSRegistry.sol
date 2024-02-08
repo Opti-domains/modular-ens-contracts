@@ -42,11 +42,12 @@ contract ModularENSRegistry is ModularENS {
     }
 
     modifier onlyRegistrar(bytes32 node) {
-        address registrar = _tld[node].registrar;
+        bytes32 tldHash = records[node].tldNode;
+        address registrar = _tld[tldHash].registrar;
         if (registrar != msg.sender || operators[registrar][msg.sender]) {
             revert NotRegistrar();
         }
-        if (_tld[node].chainId != block.chainid) {
+        if (_tld[tldHash].chainId != block.chainid) {
             revert NotPrimaryChain();
         }
         _;
@@ -102,11 +103,12 @@ contract ModularENSRegistry is ModularENS {
     }
 
     function name(bytes32 node) public view returns (string memory) {
-        return records[node].name;
+        if (node == bytes32(0)) return "";
+        return string.concat(records[node].label, ".", name(records[node].parentNode));
     }
 
     function dnsEncoded(bytes32 node) public view returns (bytes memory dnsName) {
-        (dnsName,) = NameEncoder.dnsEncodeName(records[node].name);
+        (dnsName,) = NameEncoder.dnsEncodeName(name(node));
     }
 
     /**
@@ -150,7 +152,7 @@ contract ModularENSRegistry is ModularENS {
      * @return Bool if record exists
      */
     function recordExists(bytes32 node) public view virtual override returns (bool) {
-        return records[node].owner != address(0x0);
+        return records[node].tldNode != bytes32(0);
     }
 
     // ============= Write functions =============
@@ -181,7 +183,7 @@ contract ModularENSRegistry is ModularENS {
         // Send hook
         address _registrar = _tld[_record.tldNode].registrar;
         if (_registrar.code.length > 0) {
-            IRegistrarHook(_registrar).updateRecord(_nameHash, _record);
+            IRegistrarHook(_registrar).updateRecord(_record);
         } else if (_registrar != address(0)) {
             revert RegistrarNotDeployed();
         }
@@ -201,13 +203,14 @@ contract ModularENSRegistry is ModularENS {
         Record memory _record = Record({
             owner: _tldObj.registrar,
             resolver: _tldObj.resolver,
+            nameHash: _nameHash,
             expiration: 0,
             registrationTime: 0,
             updatedTimestamp: 0,
             parentNode: bytes32(0),
             tldNode: _tldNode,
             nonce: 0,
-            name: _tldObj.name,
+            label: _tldObj.name,
             data: ""
         });
 
@@ -222,7 +225,7 @@ contract ModularENSRegistry is ModularENS {
         onlyRegistrar(_nameHash)
         returns (bytes32 _merkleRoot, uint256 _nonce)
     {
-        if (records[_nameHash].resolver == address(0)) {
+        if (records[_nameHash].tldNode == bytes32(0)) {
             revert NotRegistered();
         }
 
@@ -263,7 +266,7 @@ contract ModularENSRegistry is ModularENS {
         bytes32 _labelHash = keccak256(abi.encodePacked(_label));
         _nameHash = keccak256(abi.encodePacked(_parentNode, _labelHash));
 
-        if (records[_nameHash].resolver != address(0)) {
+        if (records[_nameHash].tldNode != bytes32(0)) {
             revert AlreadyRegistered();
         } else {
             bytes32 _tldNode = tldNode(_parentNode);
@@ -273,13 +276,14 @@ contract ModularENSRegistry is ModularENS {
             Record memory _record = Record({
                 owner: _owner,
                 resolver: _resolver,
+                nameHash: _nameHash,
                 expiration: _expiration,
                 registrationTime: block.timestamp,
                 updatedTimestamp: block.timestamp,
                 parentNode: _parentNode,
                 tldNode: _tldNode,
                 nonce: merkleForest.latestNonce(_tldNode),
-                name: string.concat(_label, ".", name(_parentNode)),
+                label: _label,
                 data: _data
             });
 

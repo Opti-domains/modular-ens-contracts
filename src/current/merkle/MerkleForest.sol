@@ -22,6 +22,7 @@ contract MerkleForest is MerkleForestSHA, OwnableUpgradeable {
     mapping(bytes32 => uint256) public rootValidFrom;
     mapping(address => uint256) public operators;
     mapping(address => bool) public challengers;
+    address public registry;
 
     error NonceOutdated();
     error EitherInsertOrRestore();
@@ -34,15 +35,27 @@ contract MerkleForest is MerkleForestSHA, OwnableUpgradeable {
     event ChallengerUpdated(address indexed challenger, bool enabled);
     event RootChallenged(address indexed challenger, bytes32 indexed root);
 
-    function initialize() public initializer {
+    function initialize(address _registry) public initializer {
+        registry = _registry;
         __Ownable_init();
+    }
+
+    modifier onlyRegistry() {
+        if (msg.sender != registry) {
+            revert NotOperator();
+        }
+        _;
     }
 
     /**
      * @notice Append a leaf to the tree
      * @param leafValue - the value of the leaf being inserted.
      */
-    function insertLeaf(bytes32 treeId, bytes32 leafValue) external onlyOwner returns (bytes32 root, uint256 nonce) {
+    function insertLeaf(bytes32 treeId, bytes32 leafValue)
+        external
+        onlyRegistry
+        returns (bytes32 root, uint256 nonce)
+    {
         if (isRestored[treeId]) revert EitherInsertOrRestore();
 
         root = _insertLeaf(leafValue, treeId); // recalculate the root of the tree

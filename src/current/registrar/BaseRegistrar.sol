@@ -4,13 +4,15 @@ pragma solidity ^0.8.8;
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "../registry/ModularENS.sol";
 import "../diamond/interfaces/IMulticallable.sol";
+import "./interfaces/IL2ReverseRegistrarPrivileged.sol";
 import "./interfaces/IRegistrarHook.sol";
-
-bytes32 constant OP_NAMEHASH = bytes32(0);
 
 contract BaseRegistrar is ERC721, IRegistrarHook {
     ModularENS public immutable registry;
     bool internal _onUpdateRecord = false;
+
+    // addr.reverse namehash
+    bytes32 constant L2ReverseNode = 0x91d1777781884d03a6757a803996e38de2a42967fb37eeaca72729271025a9e2;
 
     error Unauthorised();
 
@@ -27,14 +29,14 @@ contract BaseRegistrar is ERC721, IRegistrarHook {
         registry = _registry;
     }
 
-    function updateRecord(bytes32 nameHash, ModularENS.Record calldata record) external {
+    function updateRecord(ModularENS.Record calldata record) external {
         if (msg.sender != address(registry)) {
             revert Unauthorised();
         }
 
         _onUpdateRecord = true;
 
-        uint256 tokenId = uint256(nameHash);
+        uint256 tokenId = uint256(record.nameHash);
 
         if (_exists(tokenId)) {
             address tokenOwner = _ownerOf(tokenId);
@@ -60,15 +62,17 @@ contract BaseRegistrar is ERC721, IRegistrarHook {
         address owner,
         uint256 expiration,
         bool reverseRecord,
-        bytes32[] calldata resolverCalldata,
-        bytes calldata data
+        bytes[] calldata resolverCalldata,
+        bytes memory data
     ) internal {
         (bytes32 node,,) = registry.register(parentNode, owner, expiration, label, data);
         registry.resolverCall(
             node, abi.encodeWithSelector(IMulticallable.multicallWithNodeCheck.selector, node, resolverCalldata)
         );
         if (reverseRecord) {
-            
+            IL2ReverseRegistrarPrivileged reverseRegistrar =
+                IL2ReverseRegistrarPrivileged(registry.tld(registry.tldNode(L2ReverseNode)).registrar);
+            reverseRegistrar.setNameFromRegistrar(registry.tldNode(node), owner, registry.name(node));
         }
     }
 

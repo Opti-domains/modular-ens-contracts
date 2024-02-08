@@ -16,13 +16,14 @@ interface ModularENS is ENSReadOnly {
     struct Record {
         address owner;
         address resolver;
+        bytes32 nameHash;
         uint256 expiration;
         uint256 registrationTime;
         uint256 updatedTimestamp;
         bytes32 parentNode;
         bytes32 tldNode;
         uint256 nonce;
-        string name;
+        string label;
         bytes data;
     }
 

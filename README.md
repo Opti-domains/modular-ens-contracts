@@ -48,7 +48,7 @@ $ anvil
 ### Deploy
 
 ```shell
-$ forge script script/DeployDev.s.sol:DeployDevScript --rpc-url $RPC_URL --private-key $PRIVATE_KEY --broadcast
+$ source .env && forge script script/DeployDev.s.sol:DeployDevScript --rpc-url $RPC_URL --private-key $PRIVATE_KEY --broadcast
 ```
 
 ### Cast
