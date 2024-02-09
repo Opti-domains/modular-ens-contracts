@@ -10,7 +10,7 @@ import "src/current/registry/ModularENSRegistry.sol";
 import "src/current/registrar/OpDomains.sol";
 
 import {DiamondResolver, Diamond} from "src/current/diamond/DiamondResolver.sol";
-import {UseRegistry, IUseRegistry} from "src/current/diamond/UseRegistry.sol";
+import {UseRegistryFacet, IUseRegistry} from "src/current/diamond/UseRegistry.sol";
 import {OptiResolverAuthBasic, IOptiResolverAuthBasic} from "src/current/resolver/auth/OptiResolverAuthBasic.sol";
 import {
     PublicResolverFacet,
@@ -63,7 +63,7 @@ contract DeployDevScript is Script {
     }
 
     function registerResolverUseRegistryFacet(Diamond diamond, ModularENSRegistry registry) internal {
-        UseRegistry facet = new UseRegistry();
+        UseRegistryFacet facet = new UseRegistryFacet();
 
         bytes4[] memory selectors = new bytes4[](1);
         uint256 selectorIndex;
@@ -182,10 +182,10 @@ contract DeployDevScript is Script {
         UniversalResolver universalResolver = new UniversalResolver(address(registry), new string[](0));
 
         // Test register .op domain
-        bytes[] memory resolverCalldata = new bytes[](0);
-        // resolverCalldata[0] = abi.encodeWithSelector(ResolverWriteActions.setAddr.selector, TestOpNode, msg.sender);
-        // resolverCalldata[1] =
-        //     abi.encodeWithSelector(ResolverWriteActions.setText.selector, TestOpNode, "com.twitter", "optidomains");
+        bytes[] memory resolverCalldata = new bytes[](2);
+        resolverCalldata[0] = abi.encodeWithSelector(ResolverWriteActions.setAddr.selector, TestOpNode, msg.sender);
+        resolverCalldata[1] =
+            abi.encodeWithSelector(ResolverWriteActions.setText.selector, TestOpNode, "com.twitter", "optidomains");
         opDomains.register("test", msg.sender, 1893456000, 0, true, resolverCalldata, "");
         opDomains.extendExpiry(TestOpNode, 1993456000, "");
 

@@ -2,11 +2,13 @@
 pragma solidity ^0.8.8;
 
 import {IDiamondWritable} from "@solidstate/contracts/proxy/diamond/writable/IDiamondWritable.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@ensdomains/ens-contracts/utils/NameEncoder.sol";
 import "./ModularENS.sol";
 import "../merkle/MerkleForest.sol";
 import "../diamond/interfaces/IDiamondCloneFactory.sol";
 import "../registrar/interfaces/IRegistrarHook.sol";
+import "forge-std/console.sol";
 
 contract ModularENSRegistry is ModularENS {
     address public immutable root;

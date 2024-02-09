@@ -42,7 +42,7 @@ $ forge snapshot
 ### Anvil
 
 ```shell
-$ anvil
+$ source .env && anvil --fork-url $FORK_URL
 ```
 
 ### Deploy

@@ -3,7 +3,6 @@ pragma solidity >=0.8.17 <0.9.0;
 
 import "./Diamond.sol";
 import "./Multicallable.sol";
-import "./UseRegistry.sol";
 
 bytes4 constant supportsInterfaceSignature = 0x01ffc9a7;
 

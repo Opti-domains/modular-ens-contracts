@@ -63,6 +63,7 @@ contract MerkleForest is MerkleForestSHA, OwnableUpgradeable {
 
         roots[treeId][nonce] = MerkleRoot({root: root, timestamp: block.timestamp, nonce: nonce});
         latestNonce[treeId] = nonce;
+        rootValidFrom[root] = block.timestamp;
 
         emit NewRoot(msg.sender, treeId, root, nonce, block.timestamp);
     }

@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.8;
 
+import {ERC165BaseInternal} from "@solidstate/contracts/introspection/ERC165/base/ERC165Base.sol";
 import "./abi-resolver/ABIResolver.sol";
 import "./addr-resolver/AddrResolver.sol";
 import "./content-hash-resolver/ContentHashResolver.sol";
@@ -25,11 +26,10 @@ contract PublicResolverFacet is
     TextResolver,
     ExtendedResolver,
     OptiResolverEAS,
-    OptiResolverAuthBasicInternal
+    OptiResolverAuthBasicInternal,
+    ERC165BaseInternal
 {
-    function initialize() public virtual override(OptiResolverAuthBasicInternal) {
-        OptiResolverAuthBasicInternal.initialize();
-
+    function initialize() public virtual {
         _setSupportsInterface(type(IABIResolver).interfaceId, true);
         _setSupportsInterface(type(IAddrResolver).interfaceId, true);
         _setSupportsInterface(type(IAddressResolver).interfaceId, true);
