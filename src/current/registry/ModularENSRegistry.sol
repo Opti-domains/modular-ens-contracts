@@ -32,7 +32,12 @@ contract ModularENSRegistry is ModularENS {
     error Impossible();
 
     event RecordChanged(
-        bytes32 indexed tldNode, bytes32 indexed namehash, address indexed owner, bytes32 merkleRoot, Record record
+        bytes32 indexed tldNode,
+        bytes32 indexed parentNode,
+        address indexed owner,
+        bytes32 nameHash,
+        bytes32 merkleRoot,
+        Record record
     );
     event NewTLD(bytes32 indexed tldNode, bytes32 indexed namehash, address indexed registrar, TLD tld);
 
@@ -255,7 +260,7 @@ contract ModularENSRegistry is ModularENS {
         _sendHook(_nameHash, _record);
 
         // Emit RecordChanged event
-        emit RecordChanged(_record.tldNode, _nameHash, _owner, _merkleRoot, _record);
+        emit RecordChanged(_record.tldNode, _record.parentNode, _owner, _nameHash, _merkleRoot, _record);
     }
 
     function register(
@@ -301,7 +306,7 @@ contract ModularENSRegistry is ModularENS {
             _sendHook(_nameHash, _record);
 
             // Emit events
-            emit RecordChanged(_tldNode, _nameHash, _owner, _merkleRoot, _record);
+            emit RecordChanged(_tldNode, _parentNode, _owner, _nameHash, _merkleRoot, _record);
             emit NewOwner(_parentNode, _labelHash, _owner);
             emit Transfer(_nameHash, _owner);
             emit NewResolver(_nameHash, _resolver);
@@ -366,7 +371,7 @@ contract ModularENSRegistry is ModularENS {
         (bytes32 _merkleRoot,) = _updateMerkle(_node, _recordHash, _record.tldNode, _record.parentNode, _record.nonce);
 
         // Emit RecordChanged event
-        emit RecordChanged(_record.tldNode, _node, _record.owner, _merkleRoot, _record);
+        emit RecordChanged(_record.tldNode, _record.parentNode, _record.owner, _node, _merkleRoot, _record);
     }
 
     // ============= Registrar operator approval functions =============
