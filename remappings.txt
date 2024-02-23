@@ -7,3 +7,5 @@ forge-std/=lib/forge-std/src/
 @ensdomains/buffer/contracts/=lib/buffer/contracts/
 @solidstate/contracts/=lib/solidstate-solidity/contracts/
 @ethereum-attestation-service/eas-contracts/contracts/=lib/eas-contracts/contracts/
+@ensdomains/evm-verifier/=lib/evmgateway/evm-verifier/
+@ensdomains/op-verifier/=lib/evmgateway/op-verifier/
