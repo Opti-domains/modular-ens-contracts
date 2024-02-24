@@ -86,6 +86,7 @@ abstract contract DNSResolver is
         view
         virtual
         override
+        ccip
         returns (bytes memory)
     {
         bytes memory response = _read(DNS_RESOLVER_SCHEMA_RECORDS, abi.encode(node, name, resource));
@@ -95,7 +96,7 @@ abstract contract DNSResolver is
         return abi.decode(response, (bytes));
     }
 
-    function dnsRecordsCount(bytes32 node, bytes32 name) public view virtual returns (uint16) {
+    function dnsRecordsCount(bytes32 node, bytes32 name) public view virtual ccip returns (uint16) {
         bytes memory response = _read(DNS_RESOLVER_SCHEMA_COUNT, abi.encode(node, name));
         if (response.length == 0) {
             return 0;
@@ -134,7 +135,7 @@ abstract contract DNSResolver is
      * @param node The ENS node to query.
      * @return result The associated contenthash.
      */
-    function zonehash(bytes32 node) external view virtual override returns (bytes memory result) {
+    function zonehash(bytes32 node) external view virtual override ccip returns (bytes memory result) {
         bytes memory response = _read(DNS_RESOLVER_SCHEMA_ZONEHASHES, abi.encode(node));
         if (response.length == 0) return "";
         result = abi.decode(response, (bytes));

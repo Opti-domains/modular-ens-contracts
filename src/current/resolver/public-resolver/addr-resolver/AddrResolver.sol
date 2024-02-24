@@ -45,7 +45,7 @@ abstract contract AddrResolver is IAddrResolver, IAddressResolver, OptiResolverA
         _write(ADDR_RESOLVER_SCHEMA, abi.encode(node, coinType), abi.encode(a));
     }
 
-    function addr(bytes32 node, uint256 coinType) public view virtual override returns (bytes memory) {
+    function addr(bytes32 node, uint256 coinType) public view virtual override ccip returns (bytes memory) {
         bytes memory response = _read(ADDR_RESOLVER_SCHEMA, abi.encode(node, coinType));
         if (response.length == 0) return "";
         return abi.decode(response, (bytes));

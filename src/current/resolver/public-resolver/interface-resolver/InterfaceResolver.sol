@@ -30,7 +30,14 @@ abstract contract InterfaceResolver is IInterfaceResolver, AddrResolver {
      * @param interfaceID The EIP 165 interface ID to check for.
      * @return The address that implements this interface, or 0 if the interface is unsupported.
      */
-    function interfaceImplementer(bytes32 node, bytes4 interfaceID) external view virtual override returns (address) {
+    function interfaceImplementer(bytes32 node, bytes4 interfaceID)
+        external
+        view
+        virtual
+        override
+        ccip
+        returns (address)
+    {
         bytes memory implementerRaw = _read(INTERFACE_RESOLVER_SCHEMA, abi.encode(node, interfaceID));
         address implementer;
         if (implementerRaw.length > 0) {

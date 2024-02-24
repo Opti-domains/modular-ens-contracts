@@ -25,7 +25,7 @@ abstract contract ContentHashResolver is IContentHashResolver, OptiResolverAttes
      * @param node The ENS node to query.
      * @return The associated contenthash.
      */
-    function contenthash(bytes32 node) external view virtual override returns (bytes memory) {
+    function contenthash(bytes32 node) external view virtual override ccip returns (bytes memory) {
         bytes memory response = _read(CONTENT_RESOLVER_SCHEMA, abi.encode(node));
         if (response.length == 0) return "";
         return abi.decode(response, (bytes));

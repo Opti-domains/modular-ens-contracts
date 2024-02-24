@@ -39,7 +39,14 @@ abstract contract ABIResolver is IABIResolver, OptiResolverAttester, OptiResolve
      * @return contentType The content type of the return value
      * @return data The ABI data
      */
-    function ABI(bytes32 node, uint256 contentTypes) external view virtual override returns (uint256, bytes memory) {
+    function ABI(bytes32 node, uint256 contentTypes)
+        external
+        view
+        virtual
+        override
+        ccip
+        returns (uint256, bytes memory)
+    {
         for (uint256 contentType = 1; contentType <= contentTypes; contentType <<= 1) {
             bytes memory data = _read(ABI_RESOLVER_SCHEMA, abi.encode(node, bytes32(contentType)));
             if ((contentType & contentTypes) != 0 && data.length > 0) {

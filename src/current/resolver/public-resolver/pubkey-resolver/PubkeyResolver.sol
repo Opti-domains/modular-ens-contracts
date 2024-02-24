@@ -34,7 +34,7 @@ abstract contract PubkeyResolver is IPubkeyResolver, OptiResolverAttester, OptiR
      * @return x The X coordinate of the curve point for the public key.
      * @return y The Y coordinate of the curve point for the public key.
      */
-    function pubkey(bytes32 node) external view virtual override returns (bytes32 x, bytes32 y) {
+    function pubkey(bytes32 node) external view virtual override ccip returns (bytes32 x, bytes32 y) {
         bytes memory response = _read(PUBKEY_RESOLVER_SCHEMA, abi.encode(node));
         if (response.length > 0) {
             (x, y) = abi.decode(response, (bytes32, bytes32));

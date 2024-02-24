@@ -265,7 +265,7 @@ contract OptidomainsL1ResolverAttester is OptiFetchTarget, OptiResolverAttesterB
         revert PleaseWriteOnL2();
     }
 
-    function _ccipBefore() internal virtual override {
+    function _ccipBefore() internal view virtual override {
         bool isCallback = _isCCIPCallback();
 
         if (isCallback) {
@@ -275,7 +275,7 @@ contract OptidomainsL1ResolverAttester is OptiFetchTarget, OptiResolverAttesterB
         }
     }
 
-    function _ccipAfter() internal virtual override {
+    function _ccipAfter() internal view virtual override {
         bool isCallback;
         assembly {
             // If length > 32 then it's a callback pointer position because

@@ -25,7 +25,7 @@ abstract contract NameResolver is INameResolver, OptiResolverAttester, OptiResol
      * @param node The ENS node to query.
      * @return result The associated name.
      */
-    function name(bytes32 node) external view virtual override returns (string memory result) {
+    function name(bytes32 node) external view virtual override ccip returns (string memory result) {
         bytes memory response = _read(NAME_RESOLVER_SCHEMA, abi.encode(node));
         if (response.length == 0) return "";
         result = abi.decode(response, (string));

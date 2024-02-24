@@ -28,7 +28,14 @@ abstract contract TextResolver is ITextResolver, OptiResolverAttester, OptiResol
      * @param key The text data key to query.
      * @return result The associated text data.
      */
-    function text(bytes32 node, string calldata key) external view virtual override returns (string memory result) {
+    function text(bytes32 node, string calldata key)
+        external
+        view
+        virtual
+        override
+        ccip
+        returns (string memory result)
+    {
         bytes memory response = _read(TEXT_RESOLVER_SCHEMA, abi.encode(node, key));
         if (response.length == 0) return "";
         result = abi.decode(response, (string));
