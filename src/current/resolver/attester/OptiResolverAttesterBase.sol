@@ -13,12 +13,7 @@ abstract contract OptiResolverAttesterBase {
         bytes body
     );
 
-    event ResolverRevoke(
-        bytes32 indexed schema,
-        address indexed recipient,
-        bytes32 indexed uid,
-        bytes header
-    );
+    event ResolverRevoke(bytes32 indexed schema, address indexed recipient, bytes32 indexed uid, bytes header);
 
     function _read(bytes32 schema, address recipient, bytes memory header)
         internal
@@ -36,4 +31,13 @@ abstract contract OptiResolverAttesterBase {
     ) internal virtual returns (bytes32);
 
     function _revoke(bytes32 schema, address recipient, bytes memory header) internal virtual returns (bytes32);
+
+    function _ccipBefore() internal virtual;
+    function _ccipAfter() internal virtual;
+
+    modifier ccip() {
+        _ccipBefore();
+        _;
+        _ccipAfter();
+    }
 }
