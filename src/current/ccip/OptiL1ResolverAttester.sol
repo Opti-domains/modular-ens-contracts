@@ -6,17 +6,25 @@ import {EVMFetcher} from "@ensdomains/evm-verifier/contracts/EVMFetcher.sol";
 import {EVMFetchTarget} from "@ensdomains/evm-verifier/contracts/EVMFetchTarget.sol";
 import {OptiFetchTarget} from "./OptiFetchTarget.sol";
 import {IEVMVerifier} from "@ensdomains/evm-verifier/contracts/IEVMVerifier.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import "@ensdomains/ens-contracts/registry/ENS.sol";
 import "../resolver/attester/OptiResolverAttesterBase.sol";
+import "./OptiL1ResolverMetadata.sol";
+import "./IOptiL1Gateway.sol";
 
 address constant REGISTRY_ADDRESS = address(0);
-address constant BASE_RESOLVER_ADDRESS = address(0);
+address constant BASE_OP_RESOLVER_ADDRESS = address(0);
+address constant BASE_ENS_RESOLVER_ADDRESS = address(0);
 
 uint256 constant FreeMemoryOccupied_error_signature =
     (0x3e9fd85b00000000000000000000000000000000000000000000000000000000);
 uint256 constant FreeMemoryOccupied_error_length = 0x20;
 
+// keccak256("CCIP_CALLBACK_SELECTOR")
 bytes32 constant CCIP_CALLBACK_SELECTOR = (0x008005059b29fe32430d77b550e3fd6faed6e319156c99f488cac9c10006b476);
+
+// keccak256("DNS_ENCODED_NAME_SELECTOR")
+bytes32 constant DNS_ENCODED_NAME_SELECTOR = (0x1bc8709fa4e9a9a9d0c17c26a82f1a28d50ebe5469b3220f3e4253c914e56bc1);
 
 bytes32 constant RESOLVER_STORAGE_NAMESPACE = keccak256("optidomains.resolver.storage");
 
@@ -35,7 +43,8 @@ library OptiL1ResolverUtils {
 
     function getOpResolverAddress(bytes32 opNode) public pure returns (address predictedAddress) {
         bytes32 saltHash = keccak256(abi.encodePacked(REGISTRY_ADDRESS, opNode));
-        predictedAddress = Clones.predictDeterministicAddress(BASE_RESOLVER_ADDRESS, saltHash, BASE_RESOLVER_ADDRESS);
+        predictedAddress =
+            Clones.predictDeterministicAddress(BASE_OP_RESOLVER_ADDRESS, saltHash, BASE_OP_RESOLVER_ADDRESS);
     }
 
     function buildAttFetchRequest(bytes32 opNode, bytes32[] calldata slots)
@@ -62,6 +71,9 @@ library OptiL1ResolverUtils {
 
 contract OptidomainsL1ResolverAttester is OptiFetchTarget, OptiResolverAttesterBase {
     using EVMFetcher for EVMFetcher.EVMFetchRequest;
+    using Address for address;
+
+    error OffchainLookup(address sender, string[] urls, bytes callData, bytes4 callbackFunction, bytes extraData);
 
     function _isCCIPCallback() private view returns (bool result) {
         // Verify the following format: [funcsig[4], ..., len[32], keccak256(prevrandao, CCIP_CALLBACK_SELECTOR)[32]]
@@ -107,7 +119,7 @@ contract OptidomainsL1ResolverAttester is OptiFetchTarget, OptiResolverAttesterB
         }
     }
 
-    function _readCCIPCallback() private view returns (bytes32 slot, bytes memory data) {
+    function _readCCIPCallback() private pure returns (bytes32 slot, bytes memory data) {
         unchecked {
             uint256 p;
             uint256 dataLength;
@@ -131,6 +143,44 @@ contract OptidomainsL1ResolverAttester is OptiFetchTarget, OptiResolverAttesterB
             assembly {
                 // Move new pointer to the next calldata
                 mstore(0x80, add(p, dataLength))
+            }
+        }
+    }
+
+    function _processCCIPFallback(bytes memory response) private pure {
+        uint256 responseLength = response.length;
+
+        if (responseLength == 0) return;
+
+        bytes memory emptyBytes = new bytes(responseLength);
+
+        // Empty primitive data types
+        if (keccak256(response) == keccak256(emptyBytes)) return;
+
+        // Empty bytes memory
+        if (responseLength >= 64) {
+            emptyBytes[31] = 0x20;
+            if (keccak256(response) == keccak256(emptyBytes)) return;
+        }
+
+        // Return response and skip every step ahead
+        assembly {
+            // Return response removing length prefix (0x20)
+            return(add(response, 0x20), responseLength)
+        }
+    }
+
+    function _intCCIPFallback() private view {
+        unchecked {
+            address[] storage officialResolvers = OptiL1ResolverMetadata.layout().officialResolvers;
+            uint256 officialResolversLength = officialResolvers.length;
+
+            for (uint256 i = 1; i <= officialResolversLength; ++i) {
+                (bool success, bytes memory response) =
+                    officialResolvers[officialResolversLength - i].staticcall(msg.data);
+                if (success) {
+                    _processCCIPFallback(response);
+                }
             }
         }
     }
@@ -173,6 +223,8 @@ contract OptidomainsL1ResolverAttester is OptiFetchTarget, OptiResolverAttesterB
     event CCIPSlot(bytes32 slot);
 
     function _finalizeCCIP() private view {
+        OptiL1ResolverMetadata.Layout storage S = OptiL1ResolverMetadata.layout();
+
         unchecked {
             bytes32[] memory slots;
             assembly {
@@ -190,9 +242,9 @@ contract OptidomainsL1ResolverAttester is OptiFetchTarget, OptiResolverAttesterB
 
                     // Check minimum calldata length requirement
                     if gt(calldataLength, 67) {
-                        // Calculate checksum: keccak256(block.prevrandao, CCIP_CALLBACK_SELECTOR)
+                        // Calculate checksum: keccak256(block.prevrandao, DNS_ENCODED_NAME_SELECTOR)
                         mstore(0x80, prevrandao()) // Load block.prevrandao value
-                        mstore(0xA0, CCIP_CALLBACK_SELECTOR) // Append CCIP_CALLBACK_SELECTOR after prevrandao
+                        mstore(0xA0, DNS_ENCODED_NAME_SELECTOR) // Append DNS_ENCODED_NAME_SELECTOR after prevrandao
                         let checksum := keccak256(0x80, 0x40) // Compute keccak256 hash of combined values
 
                         // Load the calldata checksum (last 32 bytes of calldata)
@@ -219,9 +271,13 @@ contract OptidomainsL1ResolverAttester is OptiFetchTarget, OptiResolverAttesterB
                 }
             }
 
-            // for (uint256 i = 0; i < slots.length; ++i) {
-            //     emit CCIPSlot(slots[i]);
-            // }
+            revert OffchainLookup(
+                address(this),
+                S.gatewayURLs,
+                abi.encodeCall(IOptiL1Gateway.getAttestations, (ensNode, slots, dnsEncodedName)),
+                OptiFetchTarget.ccipAttCallback.selector,
+                abi.encode(ensNode, slots, msg.data)
+            );
         }
     }
 
@@ -272,6 +328,7 @@ contract OptidomainsL1ResolverAttester is OptiFetchTarget, OptiResolverAttesterB
             _initCCIPCallback();
         } else {
             _initCCIPFetch();
+            _intCCIPFallback();
         }
     }
 
