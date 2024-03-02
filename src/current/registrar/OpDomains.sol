@@ -17,7 +17,7 @@ contract OpDomains is FuseRegistrar {
         bytes[] calldata resolverCalldata,
         bytes calldata signature
     ) external payable {
-        _register(label, OP_NAMEHASH, owner, expiration, reverseRecord, resolverCalldata, abi.encode(0));
+        _register(label, OP_NAMEHASH, owner, expiration, fuses, reverseRecord, resolverCalldata);
     }
 
     function extendExpiry(bytes32 node, uint256 expiration, bytes calldata signature) external payable {

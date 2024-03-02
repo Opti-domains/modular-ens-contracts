@@ -10,19 +10,48 @@ import "./interfaces/IRegistrarHook.sol";
 contract BaseRegistrar is ERC721, IRegistrarHook {
     ModularENS public immutable registry;
     bool internal _onUpdateRecord = false;
+    bool internal _isParentNode = false;
 
     // addr.reverse namehash
     bytes32 constant L2ReverseNode = 0x91d1777781884d03a6757a803996e38de2a42967fb37eeaca72729271025a9e2;
 
+    uint256[50] private __gap;
+
     error Unauthorised();
 
-    modifier authorised(bytes32 node) {
+    function _isAuthorised(bytes32 node) internal view virtual returns (bool) {
         address owner = registry.owner(node);
-        if (msg.sender == owner || registry.isApprovedForAll(owner, msg.sender)) {
-            _;
+        return msg.sender == owner || registry.isApprovedForAll(owner, msg.sender);
+    }
+
+    function _isParentAuthorised(bytes32 node) internal view virtual returns (bool) {
+        return _isAuthorised(registry.parentNode(node));
+    }
+
+    modifier authorised(bytes32 node) {
+        if (!_isParentAuthorised(node)) {
+            if (!_isAuthorised(node)) {
+                revert Unauthorised();
+            }
         } else {
-            revert Unauthorised();
+            _isParentNode = true;
         }
+
+        _;
+
+        _isParentNode = false;
+    }
+
+    modifier parentAuthorised(bytes32 node) {
+        if (!_isParentAuthorised(node)) {
+            revert Unauthorised();
+        } else {
+            _isParentNode = true;
+        }
+
+        _;
+
+        _isParentNode = false;
     }
 
     constructor(string memory name, string memory symbol, ModularENS _registry) ERC721(name, symbol) {
@@ -64,7 +93,7 @@ contract BaseRegistrar is ERC721, IRegistrarHook {
         bool reverseRecord,
         bytes[] calldata resolverCalldata,
         bytes memory data
-    ) internal {
+    ) internal virtual {
         (bytes32 node,,) = registry.register(parentNode, owner, expiration, label, data);
         registry.resolverCall(
             node, abi.encodeWithSelector(IMulticallable.multicallWithNodeCheck.selector, node, resolverCalldata)
@@ -76,7 +105,7 @@ contract BaseRegistrar is ERC721, IRegistrarHook {
         }
     }
 
-    function _setExpiration(bytes32 node, uint256 expiration) internal {
+    function _setExpiration(bytes32 node, uint256 expiration) internal virtual {
         registry.setExpiration(node, expiration);
     }
 
@@ -87,14 +116,5 @@ contract BaseRegistrar is ERC721, IRegistrarHook {
         bytes calldata data
     ) public virtual authorised(node) {
         registry.resolverDiamondCut(node, facetCuts, target, data);
-    }
-
-    function resolverCall(bytes32 node, bytes calldata resolverCalldata)
-        public
-        payable
-        authorised(node)
-        returns (bytes memory)
-    {
-        return registry.resolverCall(node, resolverCalldata);
     }
 }

@@ -10,6 +10,26 @@ bytes32 constant RESOLVER_STORAGE_NAMESPACE = keccak256("optidomains.resolver.st
 address constant EAS = 0x4200000000000000000000000000000000000021;
 
 contract OptiResolverEAS is OptiResolverAttesterBase {
+    error HeaderMustIncludeNode();
+
+    function _storageSlot(bytes32 schema, address recipient, bytes memory header) private pure returns (bytes32 s) {
+        if (header.length < 32) revert HeaderMustIncludeNode();
+
+        bytes memory packed = abi.encodePacked(header, schema, recipient, RESOLVER_STORAGE_NAMESPACE);
+        uint256 packedLength = packed.length;
+
+        assembly {
+            // keccak256 hash omiting node
+            s := keccak256(add(packed, 0x40), sub(packedLength, 0x20))
+
+            // Store above hash next to the node
+            mstore(add(packed, 0x40), s)
+
+            // slot = keccak256 of node and the hash above
+            s := keccak256(add(packed, 0x20), 0x40)
+        }
+    }
+
     function _read(bytes32 schema, address recipient, bytes memory header)
         internal
         view
@@ -17,7 +37,7 @@ contract OptiResolverEAS is OptiResolverAttesterBase {
         override
         returns (bytes memory data)
     {
-        bytes32 s = keccak256(abi.encode(RESOLVER_STORAGE_NAMESPACE, schema, recipient, header));
+        bytes32 s = _storageSlot(schema, recipient, header);
         bytes32 uid;
 
         assembly {
@@ -59,7 +79,7 @@ contract OptiResolverEAS is OptiResolverAttesterBase {
         bytes memory header,
         bytes memory body
     ) internal virtual override returns (bytes32 uid) {
-        bytes32 s = keccak256(abi.encode(RESOLVER_STORAGE_NAMESPACE, schema, recipient, header));
+        bytes32 s = _storageSlot(schema, recipient, header);
 
         uid = IEAS(EAS).attest(
             AttestationRequest({
@@ -89,7 +109,7 @@ contract OptiResolverEAS is OptiResolverAttesterBase {
         override
         returns (bytes32 uid)
     {
-        bytes32 s = keccak256(abi.encode(RESOLVER_STORAGE_NAMESPACE, schema, recipient, header));
+        bytes32 s = _storageSlot(schema, recipient, header);
 
         assembly {
             // Fetch UID from the storage slot

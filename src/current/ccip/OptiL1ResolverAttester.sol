@@ -1,20 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {EVMFetcher} from "@ensdomains/evm-verifier/contracts/EVMFetcher.sol";
 import {EVMFetchTarget} from "@ensdomains/evm-verifier/contracts/EVMFetchTarget.sol";
 import {OptiFetchTarget} from "./OptiFetchTarget.sol";
-import {IEVMVerifier} from "@ensdomains/evm-verifier/contracts/IEVMVerifier.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import "@ensdomains/ens-contracts/registry/ENS.sol";
 import "../resolver/attester/OptiResolverAttesterBase.sol";
 import "./OptiL1ResolverMetadata.sol";
+import "./OptiL1ResolverUtils.sol";
 import "./IOptiL1Gateway.sol";
-
-address constant REGISTRY_ADDRESS = address(0);
-address constant BASE_OP_RESOLVER_ADDRESS = address(0);
-address constant BASE_ENS_RESOLVER_ADDRESS = address(0);
 
 uint256 constant FreeMemoryOccupied_error_signature =
     (0x3e9fd85b00000000000000000000000000000000000000000000000000000000);
@@ -32,48 +26,28 @@ error CCIPSlotOverflow();
 error PleaseWriteOnL2();
 error InvalidSlot();
 
-library OptiL1ResolverUtils {
-    using EVMFetcher for EVMFetcher.EVMFetchRequest;
-
-    function _addOperation(EVMFetcher.EVMFetchRequest memory request, uint8 op) private pure {
-        uint256 commandIdx = request.commands.length - 1;
-        request.commands[commandIdx] =
-            request.commands[commandIdx] | (bytes32(bytes1(op)) >> (8 * request.operationIdx++));
-    }
-
-    function getOpResolverAddress(bytes32 opNode) public pure returns (address predictedAddress) {
-        bytes32 saltHash = keccak256(abi.encodePacked(REGISTRY_ADDRESS, opNode));
-        predictedAddress =
-            Clones.predictDeterministicAddress(BASE_OP_RESOLVER_ADDRESS, saltHash, BASE_OP_RESOLVER_ADDRESS);
-    }
-
-    function buildAttFetchRequest(bytes32 opNode, bytes32[] calldata slots)
-        public
-        view
-        returns (EVMFetcher.EVMFetchRequest memory request)
-    {
-        address target = getOpResolverAddress(opNode);
-        request = EVMFetcher.newFetchRequest(IEVMVerifier(address(this)), target);
-
-        unchecked {
-            uint256 slotsLength = slots.length;
-            for (uint256 i = 0; i < slotsLength; ++i) {
-                request.getStatic(uint256(slots[i]));
-            }
-
-            if (request.commands.length > 0 && request.operationIdx < 32) {
-                // Terminate last command
-                _addOperation(request, 0xff);
-            }
-        }
-    }
-}
-
 contract OptidomainsL1ResolverAttester is OptiFetchTarget, OptiResolverAttesterBase {
     using EVMFetcher for EVMFetcher.EVMFetchRequest;
     using Address for address;
 
     error OffchainLookup(address sender, string[] urls, bytes callData, bytes4 callbackFunction, bytes extraData);
+    error HeaderMustIncludeNode();
+
+    function _storageSlotCommon(bytes32 schema, address recipient, bytes memory header)
+        private
+        pure
+        returns (bytes32 s)
+    {
+        if (header.length < 32) revert HeaderMustIncludeNode();
+
+        bytes memory packed = abi.encodePacked(header, schema, recipient, RESOLVER_STORAGE_NAMESPACE);
+        uint256 packedLength = packed.length;
+
+        assembly {
+            // keccak256 hash omiting node
+            s := keccak256(add(packed, 0x40), sub(packedLength, 0x20))
+        }
+    }
 
     function _isCCIPCallback() private view returns (bool result) {
         // Verify the following format: [funcsig[4], ..., len[32], keccak256(prevrandao, CCIP_CALLBACK_SELECTOR)[32]]
@@ -295,7 +269,7 @@ contract OptidomainsL1ResolverAttester is OptiFetchTarget, OptiResolverAttesterB
             isCallback := gt(mload(0x80), 32)
         }
 
-        bytes32 s = keccak256(abi.encode(RESOLVER_STORAGE_NAMESPACE, schema, recipient, header));
+        bytes32 s = _storageSlotCommon(schema, recipient, header);
 
         if (isCallback) {
             (bytes32 slot, bytes memory data) = _readCCIPCallback();
