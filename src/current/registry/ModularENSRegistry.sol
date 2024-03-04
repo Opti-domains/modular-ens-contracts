@@ -71,7 +71,7 @@ contract ModularENSRegistry is ModularENS {
 
     function _validNode(bytes32 node) internal view returns (bool) {
         uint256 _expiration = expiration(node);
-        return (block.timestamp <= _expiration || _expiration == 0) && !merkleForest.isFraud(nodeMerkleRoot[node]);
+        return (block.timestamp <= _expiration || _expiration == 0) && merkleForest.isValidRoot(nodeMerkleRoot[node]);
     }
 
     function expiration(bytes32 node) public view returns (uint256) {

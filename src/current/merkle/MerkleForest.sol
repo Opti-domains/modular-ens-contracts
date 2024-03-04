@@ -6,10 +6,14 @@
 pragma solidity ^0.8.8;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "../challenger/RootChallenger.sol";
+import "../utils/SignatureValidator.sol";
 import "./MerkleForestSHA.sol";
 import "./MerkleProof.sol";
 
-contract MerkleForest is MerkleForestSHA, OwnableUpgradeable {
+bytes32 constant TOPIC_RESTORE_ROOT = keccak256("optidomains.MerkleForest.restoreRootWithSig");
+
+contract MerkleForest is MerkleForestSHA, RootChallenger, OwnableUpgradeable {
     struct MerkleRoot {
         bytes32 root;
         uint256 timestamp;
@@ -19,24 +23,19 @@ contract MerkleForest is MerkleForestSHA, OwnableUpgradeable {
     mapping(bytes32 => mapping(uint256 => MerkleRoot)) roots;
     mapping(bytes32 => uint256) public latestNonce;
     mapping(bytes32 => bool) public isRestored;
-    mapping(bytes32 => uint256) public rootValidFrom;
-    mapping(address => uint256) public operators;
-    mapping(address => bool) public challengers;
     address public registry;
 
+    error InvalidSignature();
     error NonceOutdated();
     error EitherInsertOrRestore();
-    error NotOperator();
 
     event NewRoot(
         address indexed operator, bytes32 indexed treeId, bytes32 indexed root, uint256 nonce, uint256 timestamp
     );
-    event OperatorUpdated(address indexed operator, uint256 challengePeriod);
-    event ChallengerUpdated(address indexed challenger, bool enabled);
-    event RootChallenged(address indexed challenger, bytes32 indexed root);
 
     function initialize(address _registry) public initializer {
         registry = _registry;
+        _setOperator(address(this), true, 0);
         __Ownable_init();
     }
 
@@ -63,57 +62,54 @@ contract MerkleForest is MerkleForestSHA, OwnableUpgradeable {
 
         roots[treeId][nonce] = MerkleRoot({root: root, timestamp: block.timestamp, nonce: nonce});
         latestNonce[treeId] = nonce;
-        rootValidFrom[root] = block.timestamp;
 
-        emit NewRoot(msg.sender, treeId, root, nonce, block.timestamp);
+        _publishChallengerRoot(address(this), root);
+
+        emit NewRoot(address(this), treeId, root, nonce, block.timestamp);
     }
 
-    function setOperator(address operator, uint256 challengePeriod) external onlyOwner {
-        operators[operator] = challengePeriod;
-        emit OperatorUpdated(operator, challengePeriod);
-    }
-
-    function setChallenger(address challenger, bool enabled) external onlyOwner {
-        challengers[challenger] = enabled;
-        emit ChallengerUpdated(challenger, enabled);
-    }
-
-    function restoreRoot(bytes32 treeId, bytes32 root, uint256 timestamp, uint256 nonce) external {
-        if (operators[msg.sender] == 0) {
-            revert NotOperator();
-        }
-
+    function _restoreRoot(address operator, bytes32 treeId, bytes32 root, uint256 timestamp, uint256 nonce) internal {
         if (!isRestored[treeId] && latestNonce[treeId] > 0) revert EitherInsertOrRestore();
 
         if (!isRestored[treeId] || nonce > latestNonce[treeId]) {
             roots[treeId][nonce] = MerkleRoot({root: root, timestamp: timestamp, nonce: nonce});
             latestNonce[treeId] = nonce;
             isRestored[treeId] = true;
-            rootValidFrom[root] = block.timestamp + operators[msg.sender] - 1;
 
-            emit NewRoot(msg.sender, treeId, root, nonce, timestamp);
+            _publishChallengerRoot(operator, root);
+
+            emit NewRoot(operator, treeId, root, nonce, timestamp);
         } else {
-            uint256 newValidity = block.timestamp + operators[msg.sender] - 1;
-            if (nonce == latestNonce[treeId] && newValidity < rootValidFrom[root]) {
-                rootValidFrom[root] = newValidity;
-            } else {
-                revert NonceOutdated();
-            }
+            revert NonceOutdated();
         }
     }
 
-    function challengeRoot(bytes32 root) external {
-        if (!challengers[msg.sender]) {
-            revert NotOperator();
-        }
-
-        rootValidFrom[root] = 0;
-
-        emit RootChallenged(msg.sender, root);
+    function restoreRoot(bytes32 treeId, bytes32 root, uint256 timestamp, uint256 nonce) external {
+        _restoreRoot(msg.sender, treeId, root, timestamp, nonce);
     }
 
-    function isFraud(bytes32 root) public view returns (bool) {
-        return rootValidFrom[root] == 0 || block.timestamp < rootValidFrom[root];
+    function restoreRootWithSig(
+        address operator,
+        bytes32 treeId,
+        bytes32 root,
+        uint256 timestamp,
+        uint256 nonce,
+        bytes memory signature
+    ) external {
+        bytes32 rootHash = keccak256(abi.encode(treeId, root, timestamp, nonce));
+        if (!SignatureValidator.validateBasicSignature(operator, TOPIC_RESTORE_ROOT, rootHash, signature)) {
+            revert InvalidSignature();
+        }
+
+        _restoreRoot(operator, treeId, root, timestamp, nonce);
+    }
+
+    function setOperator(address operator, bool enabled, uint96 challengePeriod) external onlyOwner {
+        _setOperator(operator, enabled, challengePeriod);
+    }
+
+    function setChallenger(address challenger, bool enabled) external onlyOwner {
+        _setChallenger(challenger, enabled);
     }
 
     function latestRoot(bytes32 treeId) public view returns (MerkleRoot memory) {

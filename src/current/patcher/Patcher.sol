@@ -9,8 +9,8 @@ import "../utils/SignatureValidator.sol";
 import "./IPatcher.sol";
 import "./DummyContract.sol";
 
-bytes32 constant TOPIC_APPLY_PATCH = keccak256("optidomains.patcher.applyPatch");
-bytes32 constant TOPIC_APPLY_PATCH_FF = keccak256("optidomains.patcher.applyPatchFF");
+bytes32 constant TOPIC_APPLY_PATCH = keccak256("optidomains.Patcher.applyPatch");
+bytes32 constant TOPIC_APPLY_PATCH_FF = keccak256("optidomains.Patcher.applyPatchFF");
 
 /**
  * @title Patcher
