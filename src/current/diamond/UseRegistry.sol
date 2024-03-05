@@ -23,6 +23,20 @@ library UseRegistry {
             }
         }
     }
+
+    function registryAndCache() internal returns (ModularENS addr) {
+        bytes32 slot = STORAGE_SLOT;
+        assembly {
+            addr := sload(slot)
+        }
+
+        if (address(addr) == address(0)) {
+            addr = registry();
+            assembly {
+                sstore(slot, addr)
+            }
+        }
+    }
 }
 
 contract UseRegistryFacet is IUseRegistry, ERC165BaseInternal {

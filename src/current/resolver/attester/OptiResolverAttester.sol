@@ -15,7 +15,7 @@ abstract contract OptiResolverAttester is OptiResolverAttesterBase {
 
     function _write(bytes32 schema, bytes memory header, bytes memory body) internal virtual returns (bytes32) {
         bytes32 node = abi.decode(header, (bytes32));
-        address recipient = UseRegistry.registry().owner(node);
+        address recipient = UseRegistry.registryAndCache().owner(node);
 
         if (recipient == address(0)) {
             revert DomainNotFound(node);
@@ -26,7 +26,7 @@ abstract contract OptiResolverAttester is OptiResolverAttesterBase {
 
     function _revoke(bytes32 schema, bytes memory header) internal virtual returns (bytes32) {
         bytes32 node = abi.decode(header, (bytes32));
-        address recipient = UseRegistry.registry().owner(node);
+        address recipient = UseRegistry.registryAndCache().owner(node);
         return _revoke(schema, recipient, header);
     }
 }
