@@ -3,13 +3,11 @@ pragma solidity ^0.8.8;
 
 import "@ethereum-attestation-service/eas-contracts/contracts/IEAS.sol";
 import "./OptiResolverAttesterBase.sol";
+import "./UseEAS.sol";
 
 bytes32 constant RESOLVER_STORAGE_NAMESPACE = keccak256("optidomains.resolver.storage");
 
-// TODO
-address constant EAS = 0x4200000000000000000000000000000000000021;
-
-contract OptiResolverEAS is OptiResolverAttesterBase {
+contract OptiResolverEAS is OptiResolverAttesterBase, UseEAS {
     error HeaderMustIncludeNode();
 
     function _storageSlot(bytes32 schema, address recipient, bytes memory header) private pure returns (bytes32 s) {
@@ -47,7 +45,7 @@ contract OptiResolverEAS is OptiResolverAttesterBase {
 
         if (uid == bytes32(0)) return "";
 
-        Attestation memory a = IEAS(EAS).getAttestation(uid);
+        Attestation memory a = _easRead(uid);
 
         if (
             a.uid == uid && a.schema == schema && (a.expirationTime == 0 || block.timestamp <= a.expirationTime)
@@ -81,7 +79,7 @@ contract OptiResolverEAS is OptiResolverAttesterBase {
     ) internal virtual override returns (bytes32 uid) {
         bytes32 s = _storageSlot(schema, recipient, header);
 
-        uid = IEAS(EAS).attest(
+        uid = _easWrite(
             AttestationRequest({
                 schema: schema,
                 data: AttestationRequestData({
