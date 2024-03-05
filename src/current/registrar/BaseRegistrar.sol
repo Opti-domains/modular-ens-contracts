@@ -19,6 +19,20 @@ contract BaseRegistrar is ERC721, IRegistrarHook {
 
     error Unauthorised();
 
+    event Registered(
+        address indexed caller,
+        address indexed owner,
+        bytes32 indexed parentNode,
+        bytes32 node,
+        uint256 expiration,
+        uint256 price,
+        bool reverseRecord,
+        string label,
+        bytes data
+    );
+    event SetExpiration(address indexed caller, bytes32 indexed node, uint256 expiration, uint256 price);
+    event ResolverCall(address indexed caller, bytes32 indexed node, bytes[] resolverCalldata);
+
     function _isAuthorised(bytes32 node) internal view virtual returns (bool) {
         address owner = registry.owner(node);
         return msg.sender == owner || registry.isApprovedForAll(owner, msg.sender);
@@ -103,10 +117,15 @@ contract BaseRegistrar is ERC721, IRegistrarHook {
                 IL2ReverseRegistrarPrivileged(registry.tld(registry.tldNode(L2ReverseNode)).registrar);
             reverseRegistrar.setNameFromRegistrar(registry.tldNode(node), owner, registry.name(node));
         }
+
+        emit Registered(msg.sender, owner, parentNode, node, expiration, msg.value, reverseRecord, label, data);
+        emit ResolverCall(msg.sender, node, resolverCalldata);
     }
 
     function _setExpiration(bytes32 node, uint256 expiration) internal virtual {
         registry.setExpiration(node, expiration);
+
+        emit SetExpiration(msg.sender, node, expiration, msg.value);
     }
 
     function resolverDiamondCut(

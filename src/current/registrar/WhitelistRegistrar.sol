@@ -7,12 +7,15 @@ import "./FuseRegistrar.sol";
 
 // bytes32 constant OP_NAMEHASH = 0x070904f45402bbf3992472be342c636609db649a8ec20a8aaa65faaafd4b8701;
 
-bytes32 constant REGISTER_COMMITMENT_TYPEHASH = keccak256("RegisterCommitment(bytes32 commitment,uint256 deadline)");
-bytes32 constant EXTEND_EXPIRY_TYPEHASH = keccak256("ExtendExpiry(bytes32 node,uint256 expiration,uint256 deadline)");
+bytes32 constant REGISTER_COMMITMENT_TYPEHASH =
+    keccak256("RegisterCommitment(bytes32 commitment,uint256 price,uint256 deadline)");
+bytes32 constant EXTEND_EXPIRY_TYPEHASH =
+    keccak256("ExtendExpiry(bytes32 node,uint256 expiration,uint256 price,uint256 deadline)");
 
 abstract contract WhitelistRegistrar is EIP712, FuseRegistrar {
     error SignatureExpired();
     error InvalidSignature();
+    error NotOperator();
 
     address public immutable operator;
     bytes32 public immutable tldNameHash;
@@ -38,7 +41,7 @@ abstract contract WhitelistRegistrar is EIP712, FuseRegistrar {
 
         bytes32 commitment = keccak256(abi.encode(label, owner, expiration, fuses, reverseRecord, resolverCalldata));
 
-        bytes32 structHash = keccak256(abi.encode(REGISTER_COMMITMENT_TYPEHASH, commitment, deadline));
+        bytes32 structHash = keccak256(abi.encode(REGISTER_COMMITMENT_TYPEHASH, commitment, msg.value, deadline));
         bytes32 digest = _hashTypedDataV4(structHash);
         if (!SignatureChecker.isValidSignatureNow(operator, digest, signature)) {
             revert InvalidSignature();
@@ -55,12 +58,25 @@ abstract contract WhitelistRegistrar is EIP712, FuseRegistrar {
             revert SignatureExpired();
         }
 
-        bytes32 structHash = keccak256(abi.encode(EXTEND_EXPIRY_TYPEHASH, node, expiration, deadline));
+        bytes32 structHash = keccak256(abi.encode(EXTEND_EXPIRY_TYPEHASH, node, expiration, msg.value, deadline));
         bytes32 digest = _hashTypedDataV4(structHash);
         if (!SignatureChecker.isValidSignatureNow(operator, digest, signature)) {
             revert InvalidSignature();
         }
 
         registry.setExpiration(node, expiration);
+    }
+
+    // This is centralized but to improve UX before going permissionless we need this
+    function operatorResolverCall(bytes32 node, bytes[] calldata resolverCalldata) public {
+        if (msg.sender != operator) {
+            revert NotOperator();
+        }
+
+        registry.resolverCall(
+            node, abi.encodeWithSelector(IMulticallable.multicallWithNodeCheck.selector, node, resolverCalldata)
+        );
+
+        emit ResolverCall(msg.sender, node, resolverCalldata);
     }
 }

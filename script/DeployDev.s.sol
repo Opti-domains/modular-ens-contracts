@@ -2,6 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Script, console2} from "forge-std/Script.sol";
+import {EIP712Helper} from "./utils/EIP712Helper.s.sol";
 
 import {IDiamondWritableInternal} from "@solidstate/contracts/proxy/diamond/writable/IDiamondWritableInternal.sol";
 
@@ -37,6 +38,8 @@ interface ResolverWriteActions {
 contract DeployDevScript is Script {
     bytes32 constant RootReverseNode = 0xa097f6721ce401e757d1223a763fef49b8b5f90bb18567ddb86fd205dff71d34;
     bytes32 constant TestOpNode = 0xfae0b61043b4c3f6c273df2f4250b206df74ff1581506844d930bf1f7356d5bf;
+
+    uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
     /// @notice Modifier that wraps a function in broadcasting.
     modifier broadcast() {
@@ -175,19 +178,41 @@ contract DeployDevScript is Script {
         reverseRegistrar.registerAddrNode();
 
         // Register .op TLD
-        OpDomains opDomains = new OpDomains(registry);
+        OpDomains opDomains = new OpDomains(registry, msg.sender);
         registerTld("op", diamond, registry, address(opDomains));
 
         // Deploy UniversalResolver
         UniversalResolver universalResolver = new UniversalResolver(address(registry), new string[](0));
+
+        // Init EIP712 helper for OpDomains
+        uint256 eip712deadline = 2000000000;
+        EIP712Helper opDomainsEIP712 = new EIP712Helper("OpDomains", "0.0.1", block.chainid, address(opDomains));
 
         // Test register .op domain
         bytes[] memory resolverCalldata = new bytes[](2);
         resolverCalldata[0] = abi.encodeWithSelector(ResolverWriteActions.setAddr.selector, TestOpNode, msg.sender);
         resolverCalldata[1] =
             abi.encodeWithSelector(ResolverWriteActions.setText.selector, TestOpNode, "com.twitter", "optidomains");
-        opDomains.register("test", msg.sender, 1893456000, 0, true, resolverCalldata, "");
-        opDomains.extendExpiry(TestOpNode, 1993456000, "");
+
+        // Backend operator sign domain registration commitment
+        {
+            bytes32 registrationCommitment =
+                keccak256(abi.encode("test", msg.sender, 1893456000, 0, true, resolverCalldata));
+            bytes32 registrationStructHash =
+                keccak256(abi.encode(REGISTER_COMMITMENT_TYPEHASH, registrationCommitment, 0.002 ether, eip712deadline));
+            bytes memory registrationSignature = opDomainsEIP712.sign(deployerPrivateKey, registrationStructHash);
+            opDomains.register{value: 0.002 ether}(
+                "test", msg.sender, 1893456000, 0, true, resolverCalldata, eip712deadline, registrationSignature
+            );
+        }
+
+        // Backend operator sign extend expiry
+        {
+            bytes32 expirationStructHash =
+                keccak256(abi.encode(EXTEND_EXPIRY_TYPEHASH, TestOpNode, 1993456000, 0.005 ether, eip712deadline));
+            bytes memory expirationSignature = opDomainsEIP712.sign(deployerPrivateKey, expirationStructHash);
+            opDomains.extendExpiry{value: 0.005 ether}(TestOpNode, 1993456000, eip712deadline, expirationSignature);
+        }
 
         // Print addresses
         console2.log("Registry address", address(registry));

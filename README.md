@@ -51,6 +51,12 @@ $ source .env && anvil --fork-url $FORK_URL
 $ source .env && forge script script/DeployDev.s.sol:DeployDevScript --rpc-url $RPC_URL --private-key $PRIVATE_KEY --broadcast
 ```
 
+### Deploy Dev
+
+```shell
+$ source .env && forge script script/DeployDev.s.sol:DeployDevScript --rpc-url $RPC_URL --private-key $PRIVATE_KEY --optimize --broadcast
+```
+
 ### Deploy to Optimism
 
 ```shell
