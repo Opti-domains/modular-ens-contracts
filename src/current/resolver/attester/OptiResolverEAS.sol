@@ -77,6 +77,10 @@ contract OptiResolverEAS is OptiResolverAttesterBase, UseEAS {
         bytes memory header,
         bytes memory body
     ) internal virtual override returns (bytes32 uid) {
+        if (body.length == 0) {
+            return _revoke(schema, recipient, header);
+        }
+
         bytes32 s = _storageSlot(schema, recipient, header);
 
         uid = _easWrite(
