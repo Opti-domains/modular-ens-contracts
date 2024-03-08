@@ -74,7 +74,8 @@ contract ModularENSRegistry is ModularENS {
 
     function _validNode(bytes32 node) internal view returns (bool) {
         uint256 _expiration = expiration(node);
-        return (block.timestamp <= _expiration || _expiration == 0) && merkleForest.isValidRoot(nodeMerkleRoot[node]);
+        return
+            (block.timestamp <= _expiration || _expiration == 0) && merkleForest.isValidMerkleRoot(nodeMerkleRoot[node]);
     }
 
     function expiration(bytes32 node) public view returns (uint256) {
@@ -252,7 +253,7 @@ contract ModularENSRegistry is ModularENS {
         // Update record values
         _record.owner = _owner;
         _record.expiration = _expiration;
-        _record.nonce = merkleForest.latestNonce(_record.tldNode);
+        _record.nonce = merkleForest.latestNonce(_record.tldNode) + 1;
         _record.updatedTimestamp = block.timestamp;
 
         // Calculate recordHash with sha256 for most compatiblility across chains
@@ -295,7 +296,7 @@ contract ModularENSRegistry is ModularENS {
                 updatedTimestamp: block.timestamp,
                 parentNode: _parentNode,
                 tldNode: _tldNode,
-                nonce: merkleForest.latestNonce(_tldNode),
+                nonce: merkleForest.latestNonce(_tldNode) + 1,
                 label: _label,
                 data: _data
             });
@@ -394,7 +395,7 @@ contract ModularENSRegistry is ModularENS {
 
         // Update record values
         _record.data = _data;
-        _record.nonce = merkleForest.latestNonce(_record.tldNode);
+        _record.nonce = merkleForest.latestNonce(_record.tldNode) + 1;
 
         // Calculate recordHash with sha256 for most compatiblility across chains
         bytes32 _recordHash = sha256(abi.encode(_record));

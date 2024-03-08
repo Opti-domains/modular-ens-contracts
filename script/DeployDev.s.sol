@@ -27,7 +27,7 @@ import {
     ITextResolver,
     IExtendedResolver
 } from "src/current/resolver/public-resolver/PublicResolverFacet.sol";
-import {UniversalResolver} from "src/current/universal-resolver/UniversalResolver.sol";
+import {UniversalResolver} from "@ensdomains/ens-contracts/utils/UniversalResolver.sol";
 import {L2ReverseRegistrar} from "src/current/registrar/L2ReverseRegistrar.sol";
 
 interface ResolverWriteActions {

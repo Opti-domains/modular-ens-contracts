@@ -21,6 +21,7 @@ contract MerkleForest is MerkleForestSHA, RootChallenger, OwnableUpgradeable {
     }
 
     mapping(bytes32 => mapping(uint256 => MerkleRoot)) roots;
+    mapping(bytes32 => bytes32) public challengerRoots;
     mapping(bytes32 => uint256) public latestNonce;
     mapping(bytes32 => bool) public isRestored;
     address public registry;
@@ -60,10 +61,12 @@ contract MerkleForest is MerkleForestSHA, RootChallenger, OwnableUpgradeable {
         root = _insertLeaf(leafValue, treeId); // recalculate the root of the tree
         nonce = ++latestNonce[treeId];
 
+        bytes32 challengerRoot = keccak256(abi.encodePacked(treeId, root, block.timestamp, nonce));
+
         roots[treeId][nonce] = MerkleRoot({root: root, timestamp: block.timestamp, nonce: nonce});
+        challengerRoots[root] = challengerRoot;
         latestNonce[treeId] = nonce;
 
-        bytes32 challengerRoot = keccak256(abi.encodePacked(treeId, root, block.timestamp, nonce));
         _publishChallengerRoot(address(this), challengerRoot);
 
         emit NewRoot(address(this), treeId, root, nonce, block.timestamp);
@@ -73,11 +76,13 @@ contract MerkleForest is MerkleForestSHA, RootChallenger, OwnableUpgradeable {
         if (!isRestored[treeId] && latestNonce[treeId] > 0) revert EitherInsertOrRestore();
 
         if (!isRestored[treeId] || nonce > latestNonce[treeId]) {
+            bytes32 challengerRoot = keccak256(abi.encodePacked(treeId, root, timestamp, nonce));
+
             roots[treeId][nonce] = MerkleRoot({root: root, timestamp: timestamp, nonce: nonce});
+            challengerRoots[root] = challengerRoot;
             latestNonce[treeId] = nonce;
             isRestored[treeId] = true;
 
-            bytes32 challengerRoot = keccak256(abi.encodePacked(treeId, root, timestamp, nonce));
             _publishChallengerRoot(operator, challengerRoot);
 
             emit NewRoot(operator, treeId, root, nonce, timestamp);
@@ -114,6 +119,10 @@ contract MerkleForest is MerkleForestSHA, RootChallenger, OwnableUpgradeable {
 
     function latestRoot(bytes32 treeId) public view returns (MerkleRoot memory) {
         return roots[treeId][latestNonce[treeId]];
+    }
+
+    function isValidMerkleRoot(bytes32 root) public view returns (bool) {
+        return isValidRoot(challengerRoots[root]);
     }
 
     function proof(bytes32 treeId, uint256 nonce, bytes32 leaf, bytes32[] calldata path)
