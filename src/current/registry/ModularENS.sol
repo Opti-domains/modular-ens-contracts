@@ -37,6 +37,8 @@ interface ModularENS is ENSReadOnly {
 
     function update(bytes32 _node, address _owner, uint256 _expiration) external returns (bytes32, uint256);
 
+    function relay(Record calldata _record, bytes32[] calldata _proof) external;
+
     // Resolver functions
 
     function resolverDiamondCut(
@@ -64,6 +66,7 @@ interface ModularENS is ENSReadOnly {
     function expiration(bytes32 node) external view returns (uint256);
     function parentNode(bytes32 node) external view returns (bytes32);
     function tldNode(bytes32 node) external view returns (bytes32);
+    function primaryChainId(bytes32 node) external view returns (uint256);
     function tld(bytes32 tldNodeHash) external view returns (TLD memory);
     function data(bytes32 node) external view returns (bytes memory);
 

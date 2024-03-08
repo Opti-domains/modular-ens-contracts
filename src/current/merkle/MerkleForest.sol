@@ -11,7 +11,7 @@ import "../utils/SignatureValidator.sol";
 import "./MerkleForestSHA.sol";
 import "./MerkleProof.sol";
 
-bytes32 constant TOPIC_RESTORE_ROOT = keccak256("optidomains.MerkleForest.restoreRootWithSig");
+bytes32 constant TOPIC_RESTORE_ROOT = keccak256("optidomains.MerkleForest.restoreRoot");
 
 contract MerkleForest is MerkleForestSHA, RootChallenger, OwnableUpgradeable {
     struct MerkleRoot {
@@ -25,9 +25,9 @@ contract MerkleForest is MerkleForestSHA, RootChallenger, OwnableUpgradeable {
     mapping(bytes32 => bool) public isRestored;
     address public registry;
 
-    error InvalidSignature();
     error NonceOutdated();
     error EitherInsertOrRestore();
+    error InvalidRoot(bytes32 root);
 
     event NewRoot(
         address indexed operator, bytes32 indexed treeId, bytes32 indexed root, uint256 nonce, uint256 timestamp
@@ -58,12 +58,13 @@ contract MerkleForest is MerkleForestSHA, RootChallenger, OwnableUpgradeable {
         if (isRestored[treeId]) revert EitherInsertOrRestore();
 
         root = _insertLeaf(leafValue, treeId); // recalculate the root of the tree
-        nonce = latestNonce[treeId]++;
+        nonce = ++latestNonce[treeId];
 
         roots[treeId][nonce] = MerkleRoot({root: root, timestamp: block.timestamp, nonce: nonce});
         latestNonce[treeId] = nonce;
 
-        _publishChallengerRoot(address(this), root);
+        bytes32 challengerRoot = keccak256(abi.encodePacked(treeId, root, block.timestamp, nonce));
+        _publishChallengerRoot(address(this), challengerRoot);
 
         emit NewRoot(address(this), treeId, root, nonce, block.timestamp);
     }
@@ -76,16 +77,13 @@ contract MerkleForest is MerkleForestSHA, RootChallenger, OwnableUpgradeable {
             latestNonce[treeId] = nonce;
             isRestored[treeId] = true;
 
-            _publishChallengerRoot(operator, root);
+            bytes32 challengerRoot = keccak256(abi.encodePacked(treeId, root, timestamp, nonce));
+            _publishChallengerRoot(operator, challengerRoot);
 
             emit NewRoot(operator, treeId, root, nonce, timestamp);
         } else {
             revert NonceOutdated();
         }
-    }
-
-    function restoreRoot(bytes32 treeId, bytes32 root, uint256 timestamp, uint256 nonce) external {
-        _restoreRoot(msg.sender, treeId, root, timestamp, nonce);
     }
 
     function restoreRootWithSig(
@@ -96,9 +94,11 @@ contract MerkleForest is MerkleForestSHA, RootChallenger, OwnableUpgradeable {
         uint256 nonce,
         bytes memory signature
     ) external {
-        bytes32 rootHash = keccak256(abi.encode(treeId, root, timestamp, nonce));
-        if (!SignatureValidator.validateBasicSignature(operator, TOPIC_RESTORE_ROOT, rootHash, signature)) {
-            revert InvalidSignature();
+        if (msg.sender != operator) {
+            bytes32 rootHash = keccak256(abi.encodePacked(treeId, root, timestamp, nonce));
+            if (!SignatureValidator.validateBasicSignature(operator, TOPIC_RESTORE_ROOT, rootHash, signature)) {
+                revert InvalidSignature();
+            }
         }
 
         _restoreRoot(operator, treeId, root, timestamp, nonce);
@@ -116,7 +116,18 @@ contract MerkleForest is MerkleForestSHA, RootChallenger, OwnableUpgradeable {
         return roots[treeId][latestNonce[treeId]];
     }
 
-    function proof(bytes32 treeId, bytes32 leaf, bytes32[] calldata path) public view returns (bool) {
-        return MerkleProof.verifyCalldata(path, latestRoot(treeId).root, leaf);
+    function proof(bytes32 treeId, uint256 nonce, bytes32 leaf, bytes32[] calldata path)
+        public
+        view
+        returns (bool, bytes32)
+    {
+        MerkleRoot storage merkleRoot = roots[treeId][nonce];
+
+        bytes32 challengerRoot = keccak256(abi.encodePacked(treeId, merkleRoot.root, merkleRoot.timestamp, nonce));
+        if (!isValidRoot(challengerRoot)) {
+            revert InvalidRoot(challengerRoot);
+        }
+
+        return (MerkleProof.verifyCalldata(path, merkleRoot.root, leaf), merkleRoot.root);
     }
 }

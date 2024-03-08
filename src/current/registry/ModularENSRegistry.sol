@@ -31,6 +31,9 @@ contract ModularENSRegistry is ModularENS {
     error BadTLD();
     error Impossible();
 
+    error NonceOutdated();
+    error InvalidRecord();
+
     event RecordChanged(
         bytes32 indexed tldNode,
         bytes32 indexed parentNode,
@@ -105,6 +108,10 @@ contract ModularENSRegistry is ModularENS {
         return _tld[tldNodeHash];
     }
 
+    function primaryChainId(bytes32 node) public view returns (uint256) {
+        return _tld[records[node].tldNode].chainId;
+    }
+
     function data(bytes32 node) public view returns (bytes memory) {
         return records[node].data;
     }
@@ -145,11 +152,10 @@ contract ModularENSRegistry is ModularENS {
     }
 
     /**
-     * @dev Returns the TTL of a node, and any records associated with it.
-     * @param node The specified node.
-     * @return ttl of the node.
+     * @dev [DEPRECATED] Returns the TTL of a node, and any records associated with it.
+     * @return ttl of the node (Always 0).
      */
-    function ttl(bytes32 node) public view virtual override returns (uint64) {
+    function ttl(bytes32) public view virtual override returns (uint64) {
         return 0;
     }
 
@@ -186,7 +192,7 @@ contract ModularENSRegistry is ModularENS {
         nodeMerkleRoot[_nameHash] = _merkleRoot;
     }
 
-    function _sendHook(bytes32 _nameHash, Record memory _record) internal {
+    function _sendHook(Record memory _record) internal {
         // Send hook
         address _registrar = _tld[_record.tldNode].registrar;
         if (_registrar.code.length > 0) {
@@ -257,7 +263,7 @@ contract ModularENSRegistry is ModularENS {
             _updateMerkle(_nameHash, _recordHash, _record.tldNode, _record.parentNode, _record.nonce);
 
         // Send hook
-        _sendHook(_nameHash, _record);
+        _sendHook(_record);
 
         // Emit RecordChanged event
         emit RecordChanged(_record.tldNode, _record.parentNode, _owner, _nameHash, _merkleRoot, _record);
@@ -303,7 +309,7 @@ contract ModularENSRegistry is ModularENS {
             (_merkleRoot, _nonce) = _updateMerkle(_nameHash, _recordHash, _tldNode, _parentNode, _record.nonce);
 
             // Send hook
-            _sendHook(_nameHash, _record);
+            _sendHook(_record);
 
             // Emit events
             emit RecordChanged(_tldNode, _parentNode, _owner, _nameHash, _merkleRoot, _record);
@@ -311,6 +317,32 @@ contract ModularENSRegistry is ModularENS {
             emit Transfer(_nameHash, _owner);
             emit NewResolver(_nameHash, _resolver);
         }
+    }
+
+    function relay(Record calldata _record, bytes32[] calldata _proof) external {
+        bytes32 _nameHash = _record.nameHash;
+
+        if (_record.nonce <= records[_nameHash].nonce) {
+            revert NonceOutdated();
+        }
+
+        bytes32 _recordHash = sha256(abi.encode(_record));
+        (bool validated, bytes32 _merkleRoot) = merkleForest.proof(_record.tldNode, _record.nonce, _recordHash, _proof);
+
+        if (!validated) {
+            revert InvalidRecord();
+        }
+
+        records[_nameHash] = _record;
+
+        // Send hook
+        _sendHook(_record);
+
+        // Emit events
+        emit RecordChanged(_record.tldNode, _record.parentNode, _record.owner, _nameHash, _merkleRoot, _record);
+        emit NewOwner(_record.parentNode, keccak256(abi.encodePacked(_record.label)), _record.owner);
+        emit Transfer(_nameHash, _record.owner);
+        emit NewResolver(_nameHash, _record.resolver);
     }
 
     // ============= Resolver functions =============

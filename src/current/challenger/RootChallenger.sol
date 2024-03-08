@@ -1,6 +1,11 @@
 pragma solidity ^0.8.8;
 
+import "../utils/SignatureValidator.sol";
+
+bytes32 constant TOPIC_CHALLENGE_ROOT = keccak256("optidomains.RootChallenger.challengeRoot");
+
 contract RootChallenger {
+    error InvalidSignature();
     error NotOperator();
     error NotChallenger();
     error CannotChallenge(bytes32 root);
@@ -69,8 +74,8 @@ contract RootChallenger {
         return challengers[a].enabled && block.timestamp > challengers[a].jailedUntil;
     }
 
-    function challengeRoot(bytes32 root) external {
-        if (!isChallenger(msg.sender)) {
+    function challengeRoot(address challenger, bytes32 root, bytes calldata signature) external {
+        if (!isChallenger(challenger)) {
             revert NotChallenger();
         }
 
@@ -82,11 +87,18 @@ contract RootChallenger {
             revert CannotChallenge(root);
         }
 
+        if (
+            msg.sender != challenger
+                && !SignatureValidator.validateBasicSignature(challenger, TOPIC_CHALLENGE_ROOT, root, signature)
+        ) {
+            revert InvalidSignature();
+        }
+
         challengerRoot[root].validFrom = 0;
-        challengerRoot[root].challenger = msg.sender;
+        challengerRoot[root].challenger = challenger;
         operators[challengerRoot[root].operator].jailedUntil = uint128(block.timestamp + 1 days);
 
-        emit RootChallenged(msg.sender, challengerRoot[root].operator, root);
+        emit RootChallenged(challenger, challengerRoot[root].operator, root);
     }
 
     function isValidRoot(bytes32 root) public view returns (bool) {

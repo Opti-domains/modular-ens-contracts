@@ -7,6 +7,7 @@ import "../attester/UseEAS.sol";
 contract OptiResolverRelayerFacet is UseEAS {
     error InvalidRoot(bytes32 root);
     error InvalidAttestation();
+    error DeprecatedAttestation();
 
     event AttestationReplayed(
         bytes32 indexed schema,
@@ -61,6 +62,18 @@ contract OptiResolverRelayerFacet is UseEAS {
                         || a.revocationTime > 0 || a.attester != address(this)
                 ) {
                     revert InvalidAttestation();
+                }
+
+                // Check if this attestation is newer than the existing one
+                bytes32 oldAttSlot = slots[i];
+                uint256 oldAttTime;
+                assembly {
+                    // Fetch attestation timestamp from the storage slot
+                    oldAttTime := sload(add(oldAttSlot, 2))
+                }
+
+                if (a.time < oldAttTime) {
+                    revert DeprecatedAttestation();
                 }
             }
 

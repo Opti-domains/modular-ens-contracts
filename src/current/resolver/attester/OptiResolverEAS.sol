@@ -100,6 +100,12 @@ contract OptiResolverEAS is OptiResolverAttesterBase, UseEAS {
         assembly {
             // Store UID to the storage slot
             sstore(s, uid)
+
+            // Store source UID (Same) to the next storage slot
+            sstore(add(s, 1), uid)
+
+            // Store source timestamp to the last storage slot
+            sstore(add(s, 2), timestamp())
         }
 
         emit ResolverWrite(schema, recipient, uid, expiration, revocable, header, body);
@@ -119,6 +125,8 @@ contract OptiResolverEAS is OptiResolverAttesterBase, UseEAS {
 
             // Clear UID from the storage slot
             sstore(s, 0)
+            sstore(add(s, 1), 0)
+            sstore(add(s, 2), 0)
         }
 
         IEAS(EAS).revoke(RevocationRequest({schema: schema, data: RevocationRequestData({uid: uid, value: 0})}));
