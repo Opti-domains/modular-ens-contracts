@@ -36,8 +36,8 @@ abstract contract OptiResolverAttesterBase {
     function _ccipAfter() internal view virtual;
 
     modifier ccip() {
-        _ccipBefore();
+        bool isInitial = _ccipBefore();
         _;
-        _ccipAfter();
+        if (isInitial) _ccipAfter();
     }
 }
