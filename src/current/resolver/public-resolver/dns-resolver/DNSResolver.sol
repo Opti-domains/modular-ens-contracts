@@ -119,7 +119,7 @@ abstract contract DNSResolver is
      * @param node The node to update.
      * @param hash The zonehash to set
      */
-    function setZonehash(bytes32 node, bytes calldata hash) external virtual authorised(node) {
+    function setZonehash(bytes32 node, bytes calldata hash) external virtual ccip authorised(node) {
         bytes memory oldhashRaw = _read(DNS_RESOLVER_SCHEMA_ZONEHASHES, abi.encode(node));
         bytes memory oldhash;
         if (oldhashRaw.length > 0) {
