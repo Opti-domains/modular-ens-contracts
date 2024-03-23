@@ -32,7 +32,7 @@ abstract contract OptiResolverAttesterBase {
 
     function _revoke(bytes32 schema, address recipient, bytes memory header) internal virtual returns (bytes32);
 
-    function _ccipBefore() internal view virtual;
+    function _ccipBefore() internal view virtual returns (bool);
     function _ccipAfter() internal view virtual;
 
     modifier ccip() {

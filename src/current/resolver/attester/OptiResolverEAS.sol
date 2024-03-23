@@ -134,6 +134,6 @@ contract OptiResolverEAS is OptiResolverAttesterBase, UseEAS {
         emit ResolverRevoke(schema, recipient, uid, header);
     }
 
-    function _ccipBefore() internal view virtual override {}
+    function _ccipBefore() internal view virtual override returns (bool) {}
     function _ccipAfter() internal view virtual override {}
 }

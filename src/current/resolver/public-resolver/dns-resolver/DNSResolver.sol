@@ -44,7 +44,7 @@ abstract contract DNSResolver is
      * @param node the namehash of the node for which to set the records
      * @param data the DNS wire format records to set
      */
-    function setDNSRecords(bytes32 node, bytes calldata data) external virtual authorised(node) {
+    function setDNSRecords(bytes32 node, bytes calldata data) external virtual ccip authorised(node) {
         uint16 resource = 0;
         uint256 offset = 0;
         bytes memory name;
